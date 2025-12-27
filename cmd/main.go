@@ -15,9 +15,9 @@
 package main
 
 import (
-	"github.com/deckhouse/lib-dhctl"
+	dhctl_sdk "github.com/deckhouse/lib-dhctl"
 )
 
 func main() {
-	lib_dhctl.Do()
+	dhctl_sdk.Do()
 }

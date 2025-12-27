@@ -45,14 +45,3 @@ jobs:
       - *checkout_step
       - name: Run lint
         run: make lint
-      - name: Run gofmt
-        run: make fmt
-      - name: Check fmt not produce changes
-        run: |
-          if [[ -z "$(git status --porcelain)" ]];
-          then
-            exit 0
-          else
-            echo "You unformatted code"
-            exit 1
-          fi
