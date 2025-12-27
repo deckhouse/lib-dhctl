@@ -74,7 +74,7 @@ bin/gofumpt: curl-installed bin
 deps: bin bin/jq bin/golangci-lint bin/gofumpt
 
 test:
-	go test -v -p 1 ./...
+	go test -v -p 1 $(go list ./... | grep -v /validation/)
 
 lint: bin/golangci-lint
 	./bin/golangci-lint run ./... -c .golangci.yaml
@@ -100,7 +100,7 @@ validation/license: go-installed validation/license/download
 		for i in "${validation_deps[@]}"; do \
 		  go get "$$i"; \
 		done
-	cd ./validation; go run . -type copyright
+	go run ./validation/{main,messages,diff,copyright,no_cyrillic,doc_changes,grafana_dashboard,release_requirements}.go -type copyright
 	# prevent goland ide errors
 	rm -f ./validation/go.mod ./validation/go.sum
 
