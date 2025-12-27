@@ -79,11 +79,11 @@ test:
 lint: bin/golangci-lint
 	./bin/golangci-lint run ./... -c .golangci.yaml
 
-lint/fix: bin/golangci-lint
-	./bin/golangci-lint run ./... -c .golangci.yaml --fix
-
 fmt: bin/gofumpt
 	 find . -type f -name '*.go' -not -path "./validation*" -print0 | xargs -0 ./bin/gofumpt -l
+
+lint/fix: bin/golangci-lint fmt
+	./bin/golangci-lint run ./... -c .golangci.yaml --fix
 
 validation/license/dir:
 	mkdir -p validation
