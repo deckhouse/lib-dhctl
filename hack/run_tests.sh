@@ -14,8 +14,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+run_tests=""
+
+if [ -n "$RUN_TEST" ]; then
+  echo "Found RUN_TEST env. Run only $RUN_TEST test"
+  run_tests="-run $RUN_TEST"
+fi
+
+run_dir="$(pwd)"
 packages="$(go list ./... | grep -v /validation/)"
 prefix="$(grep -oP 'module .*$' go.mod | sed 's|module ||')"
+
+echo "Found packages: $packages in $run_dir with module $prefix"
 
 for p in "$packages"; do
   pkg_dir="${p#$prefix}"
@@ -23,5 +33,8 @@ for p in "$packages"; do
     echo "Package $p cannot have dir after trim $prefix"
     exit 1
   fi
-  go test -v -p 1 "./${pkg_dir}"
+  full_pkg_path="${run_dir}${pkg_dir}"
+  echo "Run tests in $full_pkg_path"
+  cd "$full_pkg_path"
+  echo "test -v -p 1 $run_tests" | xargs go
 done

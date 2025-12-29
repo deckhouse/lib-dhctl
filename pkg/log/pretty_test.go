@@ -155,7 +155,7 @@ func TestPrettyFollowInterfaces(t *testing.T) {
 }
 
 func testNewPretty(opts LoggerOptions) (*PrettyLogger, *InMemoryLogger) {
-	inMemoryLogger := NewInMemoryLoggerWithParent(NewSimpleLogger(opts))
+	inMemoryLogger := NewInMemoryLoggerWithParent(NewDummyLogger(opts.IsDebug))
 
 	opts.OutStream = inMemoryLogger
 
@@ -182,14 +182,14 @@ func testPrettyLoggerProcess(t *testing.T, tst *testPrettyLogger) {
 		inRunMsg := fmt.Sprintf("run in process: %s", string(tst.process))
 
 		err := tst.logger.Process(tst.process, processName, func() error {
-			tst.logger.InfoF(inRunMsg)
+			tst.logger.InfoFLn(inRunMsg)
 			return nil
 		})
 
 		require.NoError(t, err)
 
 		inRunEscaped := regexp.QuoteMeta(inRunMsg)
-		expInRun := regexp.MustCompile(fmt.Sprintf("^.* %s$", inRunEscaped))
+		expInRun := regexp.MustCompile(fmt.Sprintf("^.* %s\\n", inRunEscaped))
 		matchesInRun, err := tst.out.AllMatches(&Match{
 			Regex: []*regexp.Regexp{expInRun},
 		})
@@ -202,7 +202,7 @@ func testPrettyLoggerProcess(t *testing.T, tst *testPrettyLogger) {
 			return
 		}
 		titleEscaped := regexp.QuoteMeta(title)
-		expProcess := regexp.MustCompile(fmt.Sprintf("^.*%s[\\s]*$", titleEscaped))
+		expProcess := regexp.MustCompile(fmt.Sprintf("^.*%s[\\w\\d\\.\\s\\(\\)]*", titleEscaped))
 		matchesProcessStartEnd, err := tst.out.AllMatches(&Match{
 			Regex: []*regexp.Regexp{expProcess},
 		})
