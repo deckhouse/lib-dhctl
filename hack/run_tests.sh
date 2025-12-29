@@ -25,9 +25,9 @@ run_dir="$(pwd)"
 packages="$(go list ./... | grep -v /validation/)"
 prefix="$(grep -oP 'module .*$' go.mod | sed 's|module ||')"
 
-echo "Found packages: $packages in $run_dir with module $prefix"
+echo "Found packages: ${packages[@]} in $run_dir with module $prefix"
 
-for p in "$packages"; do
+while IFS= read -r p; do
   pkg_dir="${p#$prefix}"
   if [ -z "$pkg_dir" ]; then
     echo "Package $p cannot have dir after trim $prefix"
@@ -37,4 +37,4 @@ for p in "$packages"; do
   echo "Run tests in $full_pkg_path"
   cd "$full_pkg_path"
   echo "test -v -p 1 $run_tests" | xargs go
-done
+done <<< "$packages"
