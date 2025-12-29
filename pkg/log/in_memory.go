@@ -26,8 +26,10 @@ import (
 )
 
 var (
-	_ Logger    = &InMemoryLogger{}
-	_ io.Writer = &InMemoryLogger{}
+	_ baseLogger              = &InMemoryLogger{}
+	_ formatWithNewLineLogger = &InMemoryLogger{}
+	_ Logger                  = &InMemoryLogger{}
+	_ io.Writer               = &InMemoryLogger{}
 )
 
 // Match
@@ -55,6 +57,8 @@ func (m *Match) IsValid() error {
 }
 
 type InMemoryLogger struct {
+	*formatWithNewLineLoggerWrapper
+
 	m       sync.RWMutex
 	entries []string
 	buffer  *bytes.Buffer
@@ -75,6 +79,8 @@ func NewInMemoryLoggerWithParent(parent Logger) *InMemoryLogger {
 	l := &InMemoryLogger{
 		entries: make([]string, 0),
 	}
+
+	l.formatWithNewLineLoggerWrapper = newFormatWithNewLineLoggerWrapper(l)
 
 	p := parent
 

@@ -16,8 +16,10 @@ package log
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
+	"github.com/name212/govalue"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,4 +30,80 @@ func assertInBuffer(t *testing.T, buf *bytes.Buffer, msg string, inOut bool) {
 		assert = require.Contains
 	}
 	assert(t, out, msg)
+}
+
+func assertFollowAllInterfaces(t *testing.T, logger Logger) {
+	t.Run("Silent logger", func(t *testing.T) {
+		assertSilentLoggerProviderFollowFormatLnInterface(t, logger)
+	})
+
+	t.Run("Format Ln logger", func(t *testing.T) {
+		assertFollowFormatLnInterface(t, logger)
+	})
+
+	t.Run("Buffered logger", func(t *testing.T) {
+		assertBufferedLoggerProviderFollowFormatLnInterface(t, logger)
+	})
+}
+
+func assertFollowFormatLnInterface(t *testing.T, logger Logger) {
+	runs := []func(){
+		func() {
+			logger.InfoFLn("INFO %s", "test_info")
+		},
+		func() {
+			logger.WarnFLn("WARN %s", "test_warn")
+		},
+
+		func() {
+			logger.DebugFLn("DEBUG %s", "test_debug")
+		},
+
+		func() {
+			logger.ErrorFLn("ERROR %v", fmt.Errorf("test_error"))
+		},
+	}
+
+	for i, run := range runs {
+		t.Run(fmt.Sprintf("Does not panic FLn func %d", i), func(t *testing.T) {
+			require.NotPanics(t, run)
+		})
+	}
+}
+
+func assertSilentLoggerProviderFollowFormatLnInterface(t *testing.T, provider silentLoggerProvider) {
+	silentLogger := provider.SilentLogger()
+
+	require.NotNil(t, silentLogger)
+
+	assertFollowFormatLnInterface(t, silentLogger)
+}
+
+func assertBufferedLoggerProviderFollowFormatLnInterfaceWithoutCheckWrite(t *testing.T, provider bufferLoggerProvider) *bytes.Buffer {
+	buf := bytes.NewBuffer(nil)
+
+	bufferedLogger := provider.BufferLogger(buf)
+
+	require.False(t, govalue.IsNil(bufferedLogger))
+
+	assertFollowFormatLnInterface(t, bufferedLogger)
+
+	return buf
+}
+
+func assertBufferedLoggerProviderFollowFormatLnInterface(t *testing.T, provider bufferLoggerProvider) {
+	buf := assertBufferedLoggerProviderFollowFormatLnInterfaceWithoutCheckWrite(t, provider)
+
+	messagesInBuffer := []string{
+		"INFO test_info",
+		"WARN test_warn",
+		"DEBUG test_debug",
+		"ERROR test_error",
+	}
+
+	bufContent := buf.String()
+
+	for _, message := range messagesInBuffer {
+		require.Contains(t, bufContent, message, "expected buffer to contain", message)
+	}
 }

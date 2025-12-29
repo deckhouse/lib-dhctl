@@ -21,18 +21,26 @@ import (
 )
 
 var (
-	_ Logger    = &DummyLogger{}
-	_ io.Writer = &DummyLogger{}
+	_ baseLogger              = &DummyLogger{}
+	_ formatWithNewLineLogger = &DummyLogger{}
+	_ Logger                  = &DummyLogger{}
+	_ io.Writer               = &DummyLogger{}
 )
 
 type DummyLogger struct {
+	*formatWithNewLineLoggerWrapper
+
 	isDebug bool
 }
 
 func NewDummyLogger(isDebug bool) *DummyLogger {
-	return &DummyLogger{
+	l := &DummyLogger{
 		isDebug: isDebug,
 	}
+
+	l.formatWithNewLineLoggerWrapper = newFormatWithNewLineLoggerWrapper(l)
+
+	return l
 }
 
 func (d *DummyLogger) ProcessLogger() ProcessLogger {
@@ -40,11 +48,11 @@ func (d *DummyLogger) ProcessLogger() ProcessLogger {
 }
 
 func (d *DummyLogger) SilentLogger() *SilentLogger {
-	return &SilentLogger{}
+	return NewSilentLogger()
 }
 
 func (d *DummyLogger) BufferLogger(buffer *bytes.Buffer) Logger {
-	return NewSimpleLogger(LoggerOptions{OutStream: buffer})
+	return NewSimpleLogger(LoggerOptions{OutStream: buffer, IsDebug: d.isDebug})
 }
 
 func (d *DummyLogger) FlushAndClose() error {

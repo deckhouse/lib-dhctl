@@ -30,8 +30,10 @@ import (
 )
 
 var (
-	_ Logger    = &PrettyLogger{}
-	_ io.Writer = &PrettyLogger{}
+	_ baseLogger              = &PrettyLogger{}
+	_ formatWithNewLineLogger = &PrettyLogger{}
+	_ Logger                  = &PrettyLogger{}
+	_ io.Writer               = &PrettyLogger{}
 )
 
 type debugLogWriter struct {
@@ -39,6 +41,8 @@ type debugLogWriter struct {
 }
 
 type PrettyLogger struct {
+	*formatWithNewLineLoggerWrapper
+
 	processTitles  Processes
 	isDebug        bool
 	logboekLogger  types.LoggerInterface
@@ -59,6 +63,8 @@ func NewPrettyLogger(opts LoggerOptions) *PrettyLogger {
 		processTitles: processes,
 		isDebug:       opts.IsDebug,
 	}
+
+	res.formatWithNewLineLoggerWrapper = newFormatWithNewLineLoggerWrapper(res)
 
 	if opts.OutStream != nil {
 		res.logboekLogger = logboek.DefaultLogger().NewSubLogger(opts.OutStream, opts.OutStream)
@@ -96,7 +102,11 @@ func (d *PrettyLogger) ProcessLogger() ProcessLogger {
 }
 
 func (d *PrettyLogger) SilentLogger() *SilentLogger {
-	return &SilentLogger{}
+	return NewSilentLogger()
+}
+
+func (d *PrettyLogger) BufferLogger(buffer *bytes.Buffer) Logger {
+	return NewPrettyLogger(LoggerOptions{OutStream: buffer, IsDebug: d.isDebug})
 }
 
 func (d *PrettyLogger) Process(p Process, t string, run func() error) error {
@@ -180,10 +190,6 @@ func (d *PrettyLogger) JSON(content []byte) {
 func (d *PrettyLogger) Write(content []byte) (int, error) {
 	d.InfoF(string(content))
 	return len(content), nil
-}
-
-func (d *PrettyLogger) BufferLogger(buffer *bytes.Buffer) Logger {
-	return NewPrettyLogger(LoggerOptions{OutStream: buffer})
 }
 
 func prettyJSON(content []byte) string {

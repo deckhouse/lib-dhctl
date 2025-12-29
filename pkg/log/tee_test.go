@@ -156,6 +156,18 @@ func TestTeeLogger(t *testing.T) {
 	})
 }
 
+func TestTeeLoggerFollowInterfaces(t *testing.T) {
+	logger, err := NewTeeLogger(
+		NewSimpleLogger(LoggerOptions{IsDebug: true}),
+		newTestWriterCloser(),
+		1024,
+	)
+
+	require.NoError(t, err)
+
+	assertFollowAllInterfaces(t, logger)
+}
+
 type testWriterCloser struct {
 	writer *bytes.Buffer
 	closed bool

@@ -22,11 +22,15 @@ import (
 )
 
 var (
-	_ Logger    = &SimpleLogger{}
-	_ io.Writer = &SimpleLogger{}
+	_ baseLogger              = &SimpleLogger{}
+	_ formatWithNewLineLogger = &SimpleLogger{}
+	_ Logger                  = &SimpleLogger{}
+	_ io.Writer               = &SimpleLogger{}
 )
 
 type SimpleLogger struct {
+	*formatWithNewLineLoggerWrapper
+
 	logger  *log.Logger
 	isDebug bool
 }
@@ -39,15 +43,22 @@ func NewSimpleLogger(opts LoggerOptions) *SimpleLogger {
 		l.SetOutput(opts.OutStream)
 	}
 
-	return &SimpleLogger{
+	if opts.IsDebug {
+		l.SetLevel(log.LevelDebug)
+	}
+
+	res := &SimpleLogger{
 		logger:  l,
 		isDebug: opts.IsDebug,
 	}
 
+	res.formatWithNewLineLoggerWrapper = newFormatWithNewLineLoggerWrapper(res)
+
+	return res
 }
 
 func (d *SimpleLogger) BufferLogger(buffer *bytes.Buffer) Logger {
-	return NewJSONLogger(LoggerOptions{OutStream: buffer})
+	return NewJSONLogger(LoggerOptions{OutStream: buffer, IsDebug: d.isDebug})
 }
 
 func (d *SimpleLogger) ProcessLogger() ProcessLogger {
@@ -55,7 +66,7 @@ func (d *SimpleLogger) ProcessLogger() ProcessLogger {
 }
 
 func (d *SimpleLogger) SilentLogger() *SilentLogger {
-	return &SilentLogger{}
+	return NewSilentLogger()
 }
 
 func (d *SimpleLogger) FlushAndClose() error {

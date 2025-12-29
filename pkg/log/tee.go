@@ -24,11 +24,15 @@ import (
 )
 
 var (
-	_ Logger    = &TeeLogger{}
-	_ io.Writer = &TeeLogger{}
+	_ baseLogger              = &TeeLogger{}
+	_ formatWithNewLineLogger = &TeeLogger{}
+	_ Logger                  = &TeeLogger{}
+	_ io.Writer               = &TeeLogger{}
 )
 
 type TeeLogger struct {
+	*formatWithNewLineLoggerWrapper
+
 	l      Logger
 	closed bool
 
@@ -37,34 +41,40 @@ type TeeLogger struct {
 	out      io.WriteCloser
 }
 
-func NewTeeLogger(l Logger, writer io.WriteCloser, bufferSize int) (*TeeLogger, error) {
-	buf := bufio.NewWriterSize(writer, bufferSize)
-
-	return &TeeLogger{
+func newTeeLoggerWithParentAndBuf(l Logger, writer io.WriteCloser, buf *bufio.Writer) *TeeLogger {
+	res := &TeeLogger{
 		l:   l,
 		buf: buf,
 		out: writer,
-	}, nil
+	}
+
+	res.formatWithNewLineLoggerWrapper = newFormatWithNewLineLoggerWrapper(res)
+
+	return res
+}
+
+func NewTeeLogger(l Logger, writer io.WriteCloser, bufferSize int) (*TeeLogger, error) {
+	buf := bufio.NewWriterSize(writer, bufferSize)
+
+	return newTeeLoggerWithParentAndBuf(l, writer, buf), nil
 }
 
 func (d *TeeLogger) BufferLogger(buffer *bytes.Buffer) Logger {
 	var l Logger
 	switch d.l.(type) {
 	case *PrettyLogger:
-		l = NewPrettyLogger(LoggerOptions{OutStream: buffer})
+		prettyLogger := d.l.(*PrettyLogger)
+		l = NewPrettyLogger(LoggerOptions{OutStream: buffer, IsDebug: prettyLogger.isDebug})
 	case *SimpleLogger:
-		l = NewJSONLogger(LoggerOptions{OutStream: buffer})
+		simpleLogger := d.l.(*SimpleLogger)
+		l = NewJSONLogger(LoggerOptions{OutStream: buffer, IsDebug: simpleLogger.isDebug})
 	default:
 		l = d.l
 	}
 
 	buf := bufio.NewWriterSize(d.out, 4096) // 1024 bytes may not be enough when executing in parallel
 
-	return &TeeLogger{
-		l:   l,
-		buf: buf,
-		out: d.out,
-	}
+	return newTeeLoggerWithParentAndBuf(l, d.out, buf)
 }
 
 func (d *TeeLogger) FlushAndClose() error {
@@ -98,9 +108,7 @@ func (d *TeeLogger) ProcessLogger() ProcessLogger {
 }
 
 func (d *TeeLogger) SilentLogger() *SilentLogger {
-	return &SilentLogger{
-		t: d,
-	}
+	return newSilentLoggerWithTee(d)
 }
 
 func (d *TeeLogger) Process(p Process, t string, run func() error) error {

@@ -14,6 +14,14 @@
 
 package log
 
-func NewJSONLogger(opts LoggerOptions) *SimpleLogger {
-	return NewSimpleLogger(opts)
+import "testing"
+
+func TestInMemoryLoggerFollowInterfaces(t *testing.T) {
+	t.Run("Default constructor", func(t *testing.T) {
+		assertFollowAllInterfaces(t, NewInMemoryLogger())
+	})
+
+	t.Run("With parent constructor", func(t *testing.T) {
+		assertFollowAllInterfaces(t, NewInMemoryLoggerWithParent(NewDummyLogger(true)))
+	})
 }

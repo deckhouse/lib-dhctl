@@ -21,18 +21,30 @@ import (
 )
 
 var (
-	_ Logger    = &SilentLogger{}
-	_ io.Writer = &SilentLogger{}
+	_ baseLogger              = &SilentLogger{}
+	_ formatWithNewLineLogger = &SilentLogger{}
+	_ Logger                  = &SilentLogger{}
+	_ io.Writer               = &SilentLogger{}
 )
 
 type SilentLogger struct {
+	*formatWithNewLineLoggerWrapper
+
 	t *TeeLogger
 }
 
 func NewSilentLogger() *SilentLogger {
-	return &SilentLogger{
-		t: nil,
+	return newSilentLoggerWithTee(nil)
+}
+
+func newSilentLoggerWithTee(t *TeeLogger) *SilentLogger {
+	l := &SilentLogger{
+		t: t,
 	}
+
+	l.formatWithNewLineLoggerWrapper = newFormatWithNewLineLoggerWrapper(l)
+
+	return l
 }
 
 func (d *SilentLogger) ProcessLogger() ProcessLogger {
@@ -40,7 +52,7 @@ func (d *SilentLogger) ProcessLogger() ProcessLogger {
 }
 
 func (d *SilentLogger) SilentLogger() *SilentLogger {
-	return &SilentLogger{}
+	return NewSilentLogger()
 }
 
 func (d *SilentLogger) BufferLogger(buffer *bytes.Buffer) Logger {

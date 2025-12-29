@@ -23,11 +23,8 @@ import (
 	"strings"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
+	"github.com/name212/govalue"
 	"github.com/werf/logboek/pkg/types"
-)
-
-var (
-	emptyLogger Logger = &SilentLogger{}
 )
 
 type Type string
@@ -94,7 +91,18 @@ type ProcessLogger interface {
 	ProcessEnd()
 }
 
-type Logger interface {
+type silentLoggerProvider interface {
+	SilentLogger() *SilentLogger
+}
+
+type bufferLoggerProvider interface {
+	BufferLogger(buffer *bytes.Buffer) Logger
+}
+
+type baseLogger interface {
+	silentLoggerProvider
+	bufferLoggerProvider
+
 	FlushAndClose() error
 
 	Process(Process, string, func() error) error
@@ -119,8 +127,18 @@ type Logger interface {
 	Write([]byte) (int, error)
 
 	ProcessLogger() ProcessLogger
-	SilentLogger() *SilentLogger
-	BufferLogger(buffer *bytes.Buffer) Logger
+}
+
+type formatWithNewLineLogger interface {
+	InfoFLn(format string, a ...any)
+	ErrorFLn(format string, a ...any)
+	DebugFLn(format string, a ...any)
+	WarnFLn(format string, a ...any)
+}
+
+type Logger interface {
+	formatWithNewLineLogger
+	baseLogger
 }
 
 type LoggerOptions struct {
@@ -160,7 +178,7 @@ func NewLogger(loggerType Type, isDebug bool) (Logger, error) {
 // NewLoggerWithOptions
 // do not init Klog use InitKlog for initialize Klog wrapper
 func NewLoggerWithOptions(loggerType Type, opts LoggerOptions) (Logger, error) {
-	l := emptyLogger
+	var l Logger
 	switch loggerType {
 	case Pretty:
 		l = NewPrettyLogger(opts)
@@ -169,9 +187,13 @@ func NewLoggerWithOptions(loggerType Type, opts LoggerOptions) (Logger, error) {
 	case JSON:
 		l = NewJSONLogger(opts)
 	case Empty:
-		l = emptyLogger
+		l = NewSilentLogger()
 	default:
 		return nil, fmt.Errorf("Unknown logger type: %s", loggerType)
+	}
+
+	if govalue.IsNil(l) {
+		return nil, fmt.Errorf("Internal error. Unable to create new logger")
 	}
 
 	// Mute Shell-Operator logs

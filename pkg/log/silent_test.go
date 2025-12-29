@@ -14,6 +14,21 @@
 
 package log
 
-func NewJSONLogger(opts LoggerOptions) *SimpleLogger {
-	return NewSimpleLogger(opts)
+import "testing"
+
+func TestSilentLoggerFollowInterfaces(t *testing.T) {
+	logger := NewSilentLogger()
+
+	t.Run("Silent logger", func(t *testing.T) {
+		assertSilentLoggerProviderFollowFormatLnInterface(t, logger)
+	})
+
+	t.Run("Format Ln logger", func(t *testing.T) {
+		assertFollowFormatLnInterface(t, logger)
+	})
+
+	// silent logger should not write anything
+	t.Run("Buffered logger", func(t *testing.T) {
+		assertBufferedLoggerProviderFollowFormatLnInterfaceWithoutCheckWrite(t, logger)
+	})
 }

@@ -150,6 +150,10 @@ func TestPrettyDebugStream(t *testing.T) {
 	})
 }
 
+func TestPrettyFollowInterfaces(t *testing.T) {
+	assertFollowAllInterfaces(t, NewPrettyLogger(LoggerOptions{IsDebug: true}))
+}
+
 func testNewPretty(opts LoggerOptions) (*PrettyLogger, *InMemoryLogger) {
 	inMemoryLogger := NewInMemoryLoggerWithParent(NewSimpleLogger(opts))
 

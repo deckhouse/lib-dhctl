@@ -14,6 +14,8 @@
 
 package log
 
-func NewJSONLogger(opts LoggerOptions) *SimpleLogger {
-	return NewSimpleLogger(opts)
+import "testing"
+
+func TestDummyLoggerFollowInterfaces(t *testing.T) {
+	assertFollowAllInterfaces(t, NewDummyLogger(true))
 }
