@@ -73,8 +73,8 @@ bin/gofumpt: curl-installed bin
 
 deps: bin bin/jq bin/golangci-lint bin/gofumpt
 
-test:
-	go test -v -p 1 $(go list ./... | grep -v /validation/)
+test: go-installed
+	./hack/run_tests.sh
 
 lint: bin/golangci-lint
 	./bin/golangci-lint run ./... -c .golangci.yaml
