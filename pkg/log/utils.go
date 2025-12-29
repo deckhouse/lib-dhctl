@@ -14,25 +14,15 @@
 
 package log
 
-import (
-	"testing"
+import "fmt"
 
-	"github.com/name212/govalue"
-	"github.com/stretchr/testify/require"
-)
-
-func TestSafeProvideLogger(t *testing.T) {
-	providers := []func(LoggerProvider) Logger{
-		SafeProvideLogger,
-	}
-
-	nilProvider := SimpleLoggerProvider(nil)
-
-	for _, provider := range providers {
-		logger := provider(nil)
-		require.False(t, govalue.IsNil(logger))
-
-		logger = provider(nilProvider)
-		require.False(t, govalue.IsNil(logger))
+func listToString(l ...any) string {
+	switch len(l) {
+	case 0:
+		return ""
+	case 1:
+		return fmt.Sprintf("%v", l[0])
+	default:
+		return fmt.Sprintf("%v", l)
 	}
 }

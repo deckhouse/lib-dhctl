@@ -61,13 +61,11 @@ func NewTeeLogger(l Logger, writer io.WriteCloser, bufferSize int) (*TeeLogger, 
 
 func (d *TeeLogger) BufferLogger(buffer *bytes.Buffer) Logger {
 	var l Logger
-	switch d.l.(type) {
+	switch typedLogger := d.l.(type) {
 	case *PrettyLogger:
-		prettyLogger := d.l.(*PrettyLogger)
-		l = NewPrettyLogger(LoggerOptions{OutStream: buffer, IsDebug: prettyLogger.isDebug})
+		l = NewPrettyLogger(LoggerOptions{OutStream: buffer, IsDebug: typedLogger.isDebug})
 	case *SimpleLogger:
-		simpleLogger := d.l.(*SimpleLogger)
-		l = NewJSONLogger(LoggerOptions{OutStream: buffer, IsDebug: simpleLogger.isDebug})
+		l = NewJSONLogger(LoggerOptions{OutStream: buffer, IsDebug: typedLogger.isDebug})
 	default:
 		l = d.l
 	}

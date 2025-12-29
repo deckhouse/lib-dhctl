@@ -81,30 +81,30 @@ func (d *SimpleLogger) Process(p Process, t string, run func() error) error {
 }
 
 func (d *SimpleLogger) InfoF(format string, a ...interface{}) {
-	d.logger.Infof(format, a...)
+	d.logger.Info(format, a...)
 }
 
 func (d *SimpleLogger) InfoLn(a ...interface{}) {
-	d.logger.Infof("%v", a)
+	d.logger.Info(listToString(a))
 }
 
 func (d *SimpleLogger) ErrorF(format string, a ...interface{}) {
-	d.logger.Errorf(format, a...)
+	d.logger.Error(format, a...)
 }
 
 func (d *SimpleLogger) ErrorLn(a ...interface{}) {
-	d.logger.Errorf("%v", a)
+	d.logger.Error(listToString(a))
 }
 
 func (d *SimpleLogger) DebugF(format string, a ...interface{}) {
 	if d.isDebug {
-		d.logger.Debugf(format, a...)
+		d.logger.Debug(format, a...)
 	}
 }
 
 func (d *SimpleLogger) DebugLn(a ...interface{}) {
 	if d.isDebug {
-		d.logger.Debugf("%v", a)
+		d.logger.Debug(listToString(a))
 	}
 }
 
@@ -122,11 +122,11 @@ func (d *SimpleLogger) FailRetry(l string) {
 }
 
 func (d *SimpleLogger) WarnF(format string, a ...interface{}) {
-	d.logger.Warnf(format, a...)
+	d.logger.Warn(format, a...)
 }
 
 func (d *SimpleLogger) WarnLn(a ...interface{}) {
-	d.logger.Warnf("%v", a)
+	d.logger.Warn(listToString(a))
 }
 
 func (d *SimpleLogger) JSON(content []byte) {
@@ -134,6 +134,6 @@ func (d *SimpleLogger) JSON(content []byte) {
 }
 
 func (d *SimpleLogger) Write(content []byte) (int, error) {
-	d.logger.Infof("%s", string(content))
+	d.logger.Info(string(content))
 	return len(content), nil
 }

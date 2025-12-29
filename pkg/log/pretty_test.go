@@ -216,7 +216,7 @@ func testPrettyLoggerDefaultProcesses(t *testing.T, tstPrefix string, logger *Pr
 
 	for process, style := range defaultProcesses {
 		if slices.Contains(expected, process) {
-			t.Log(fmt.Sprintf("Default process '%s' skipped", process))
+			t.Logf("Default process '%s' skipped", process)
 			continue
 		}
 

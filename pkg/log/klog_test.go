@@ -51,13 +51,13 @@ func TestInitKlogWithVerbose(t *testing.T) {
 		newKlogTest(1),
 		newKlogTest(2),
 		newKlogTest(3),
-		newKlogTest(4).withOut(false),
-		newKlogTest(5).withOut(false),
-		newKlogTest(6).withOut(false),
-		newKlogTest(7).withOut(false),
-		newKlogTest(8).withOut(false),
-		newKlogTest(9).withOut(false),
-		newKlogTest(10).withOut(false),
+		newKlogTest(4).withoutOut(),
+		newKlogTest(5).withoutOut(),
+		newKlogTest(6).withoutOut(),
+		newKlogTest(7).withoutOut(),
+		newKlogTest(8).withoutOut(),
+		newKlogTest(9).withoutOut(),
+		newKlogTest(10).withoutOut(),
 	}, testGetDefaultKeywordTests(true)...)
 
 	tests = append(tests, testCreateSensitive(`"kind":"ConfigMap"`, false))
@@ -94,8 +94,8 @@ func TestInitKlogWithDummySanitizerAndVerbose(t *testing.T) {
 
 	tests := append([]*baseKlogTest{
 		newKlogTest(1),
-		newKlogTest(3).withOut(false),
-		newKlogTest(10).withOut(false),
+		newKlogTest(3).withoutOut(),
+		newKlogTest(10).withoutOut(),
 	}, testGetDefaultKeywordTests(false)...)
 
 	tests = append(tests, testCreateSensitive(`"kind":"Pod"`, false))
@@ -137,14 +137,8 @@ func (t *baseKlogTest) withName(name string) *baseKlogTest {
 	return t
 }
 
-func (t *baseKlogTest) withOutMsg(msg string) *baseKlogTest {
-	t.outMsg = msg
-
-	return t
-}
-
-func (t *baseKlogTest) withOut(shouldOut bool) *baseKlogTest {
-	t.shouldOut = shouldOut
+func (t *baseKlogTest) withoutOut() *baseKlogTest {
+	t.shouldOut = false
 
 	return t
 }

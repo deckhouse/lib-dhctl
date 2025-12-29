@@ -115,9 +115,7 @@ func NewKeywordSanitizer() *KeywordSanitizer {
 }
 
 func (l *KeywordSanitizer) WithAdditionalKeywords(keywords []string) *KeywordSanitizer {
-	for _, keyword := range keywords {
-		l.keywords = append(l.keywords, keyword)
-	}
+	l.keywords = append(l.keywords, keywords...)
 
 	return l
 }
@@ -148,7 +146,7 @@ func (l *KeywordSanitizer) FilterS(msg string, keysAndValues []any) (string, []a
 }
 
 // isSensitive - returns empty if is not sensitive
-func (l *KeywordSanitizer) isSensitive(msg string) (byKeyword string) {
+func (l *KeywordSanitizer) isSensitive(msg string) string {
 	for _, keyword := range l.keywords {
 		if strings.Contains(msg, keyword) {
 			return keyword
@@ -169,7 +167,7 @@ func newKlogWriterWrapper(logger Logger) *klogWriterWrapper {
 	return &klogWriterWrapper{logger: logger}
 }
 
-func (l *klogWriterWrapper) Write(p []byte) (n int, err error) {
+func (l *klogWriterWrapper) Write(p []byte) (int, error) {
 	l.logger.DebugF("klog: %s", string(p))
 
 	return len(p), nil

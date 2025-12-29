@@ -171,8 +171,9 @@ func (l *InMemoryLogger) InfoF(format string, a ...interface{}) {
 	l.writeEntityFormatted(format, a...)
 	l.parent.InfoF(format, a...)
 }
+
 func (l *InMemoryLogger) InfoLn(a ...interface{}) {
-	l.writeEntityFormatted("%v\n", a)
+	l.writeEntityFormatted(listToString(a))
 	l.parent.InfoLn(a...)
 }
 
@@ -180,8 +181,9 @@ func (l *InMemoryLogger) ErrorF(format string, a ...interface{}) {
 	l.writeEntityWithPrefix(l.errorPrefix, format, a...)
 	l.parent.ErrorF(format, a...)
 }
+
 func (l *InMemoryLogger) ErrorLn(a ...interface{}) {
-	l.writeEntityWithPrefix(l.errorPrefix, "%v\n", a)
+	l.writeEntityWithPrefix(l.errorPrefix, listToString(a))
 	l.parent.ErrorLn(a...)
 }
 
@@ -199,7 +201,7 @@ func (l *InMemoryLogger) DebugLn(a ...interface{}) {
 		return
 	}
 
-	l.writeEntityWithPrefix(l.debugPrefix, "%v\n", a)
+	l.writeEntityWithPrefix(l.debugPrefix, listToString(a))
 	l.parent.DebugLn(a...)
 }
 
@@ -207,8 +209,9 @@ func (l *InMemoryLogger) WarnF(format string, a ...interface{}) {
 	l.writeEntityFormatted(format, a...)
 	l.parent.WarnF(format, a...)
 }
+
 func (l *InMemoryLogger) WarnLn(a ...interface{}) {
-	l.writeEntityFormatted("%v\n", a)
+	l.writeEntityFormatted(listToString(a))
 	l.parent.WarnLn(a...)
 }
 
@@ -216,11 +219,12 @@ func (l *InMemoryLogger) Success(s string) {
 	l.writeEntityFormatted("Success: %s", s)
 	l.parent.Success(s)
 }
+
 func (l *InMemoryLogger) Fail(s string) {
 	l.writeEntityWithPrefix(l.errorPrefix, "Fail: %s", s)
 	l.parent.Fail(s)
-
 }
+
 func (l *InMemoryLogger) FailRetry(s string) {
 	l.writeEntityWithPrefix(l.errorPrefix, "Fail retry: %s", s)
 	l.parent.FailRetry(s)

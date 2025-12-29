@@ -185,6 +185,6 @@ func (t *testWriterCloser) Close() error {
 	return nil
 }
 
-func (t *testWriterCloser) Write(p []byte) (n int, err error) {
+func (t *testWriterCloser) Write(p []byte) (int, error) {
 	return t.writer.Write(p)
 }
