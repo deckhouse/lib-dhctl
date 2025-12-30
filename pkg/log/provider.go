@@ -27,14 +27,14 @@ func SimpleLoggerProvider(logger Logger) LoggerProvider {
 }
 
 func SafeProvideLogger(provider LoggerProvider) Logger {
-	return provideSafe(provider, silentLoggerInstance)
+	return ProvideSafe(provider, silentLoggerInstance)
 }
 
 func SilentLoggerProvider() LoggerProvider {
 	return SimpleLoggerProvider(silentLoggerInstance)
 }
 
-func provideSafe(provider LoggerProvider, defaultLogger Logger) Logger {
+func ProvideSafe(provider LoggerProvider, defaultLogger Logger) Logger {
 	if provider != nil {
 		logger := provider()
 		if !govalue.IsNil(logger) {
