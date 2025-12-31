@@ -3,7 +3,7 @@ module github.com/deckhouse/lib-dhctl
 go 1.25.3
 
 require (
-	github.com/deckhouse/deckhouse/pkg/log v0.1.0
+	github.com/deckhouse/deckhouse/pkg/log v0.1.1-0.20251230144142-2bad7c3d1edf
 	github.com/gookit/color v1.5.2
 	github.com/name212/govalue v1.0.2
 	github.com/stretchr/testify v1.9.0

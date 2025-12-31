@@ -22,10 +22,9 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/deckhouse/deckhouse/pkg/log"
 	"github.com/name212/govalue"
 	"github.com/werf/logboek/pkg/types"
-
-	"github.com/deckhouse/deckhouse/pkg/log"
 )
 
 type Type string
