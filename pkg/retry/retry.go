@@ -329,7 +329,7 @@ func (l *Loop) run(ctx context.Context, task func() error) error {
 			}
 
 			if l.breakPredicate != nil && l.breakPredicate(err) {
-				l.logger.DebugFLn(l.prefix+"Client break loop with %v", err)
+				l.logger.DebugF(l.prefix+"Client break loop with %v", err)
 				return err
 			}
 

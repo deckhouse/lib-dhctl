@@ -167,9 +167,9 @@ func (l *InMemoryLogger) Process(p Process, t string, action func() error) error
 	return err
 }
 
-func (l *InMemoryLogger) InfoF(format string, a ...interface{}) {
+func (l *InMemoryLogger) InfoFWithoutLn(format string, a ...interface{}) {
 	l.writeEntityFormatted(format, a...)
-	l.parent.InfoF(format, a...)
+	l.parent.InfoFWithoutLn(format, a...)
 }
 
 func (l *InMemoryLogger) InfoLn(a ...interface{}) {
@@ -177,9 +177,9 @@ func (l *InMemoryLogger) InfoLn(a ...interface{}) {
 	l.parent.InfoLn(a...)
 }
 
-func (l *InMemoryLogger) ErrorF(format string, a ...interface{}) {
+func (l *InMemoryLogger) ErrorFWithoutLn(format string, a ...interface{}) {
 	l.writeEntityWithPrefix(l.errorPrefix, format, a...)
-	l.parent.ErrorF(format, a...)
+	l.parent.ErrorFWithoutLn(format, a...)
 }
 
 func (l *InMemoryLogger) ErrorLn(a ...interface{}) {
@@ -187,13 +187,13 @@ func (l *InMemoryLogger) ErrorLn(a ...interface{}) {
 	l.parent.ErrorLn(a...)
 }
 
-func (l *InMemoryLogger) DebugF(format string, a ...interface{}) {
+func (l *InMemoryLogger) DebugFWithoutLn(format string, a ...interface{}) {
 	if l.notDebug {
 		return
 	}
 
 	l.writeEntityWithPrefix(l.debugPrefix, format, a...)
-	l.parent.DebugF(format, a...)
+	l.parent.DebugFWithoutLn(format, a...)
 }
 
 func (l *InMemoryLogger) DebugLn(a ...interface{}) {
@@ -205,9 +205,9 @@ func (l *InMemoryLogger) DebugLn(a ...interface{}) {
 	l.parent.DebugLn(a...)
 }
 
-func (l *InMemoryLogger) WarnF(format string, a ...interface{}) {
+func (l *InMemoryLogger) WarnFWithoutLn(format string, a ...interface{}) {
 	l.writeEntityFormatted(format, a...)
-	l.parent.WarnF(format, a...)
+	l.parent.WarnFWithoutLn(format, a...)
 }
 
 func (l *InMemoryLogger) WarnLn(a ...interface{}) {

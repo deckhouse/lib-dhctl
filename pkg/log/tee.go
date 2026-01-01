@@ -85,7 +85,7 @@ func (d *TeeLogger) FlushAndClose() error {
 
 	err := d.buf.Flush()
 	if err != nil {
-		d.l.WarnF("Cannot flush TeeLogger: %v \n", err)
+		d.l.WarnF("Cannot flush TeeLogger: %v", err)
 		return err
 	}
 
@@ -93,7 +93,7 @@ func (d *TeeLogger) FlushAndClose() error {
 
 	err = d.out.Close()
 	if err != nil {
-		d.l.WarnF("Cannot close TeeLogger file: %v \n", err)
+		d.l.WarnF("Cannot close TeeLogger file: %v", err)
 		return err
 	}
 
@@ -119,8 +119,8 @@ func (d *TeeLogger) Process(p Process, t string, run func() error) error {
 	return err
 }
 
-func (d *TeeLogger) InfoF(format string, a ...interface{}) {
-	d.l.InfoF(format, a...)
+func (d *TeeLogger) InfoFWithoutLn(format string, a ...interface{}) {
+	d.l.InfoFWithoutLn(format, a...)
 
 	d.writeToFile(fmt.Sprintf(format, a...))
 }
@@ -131,8 +131,8 @@ func (d *TeeLogger) InfoLn(a ...interface{}) {
 	d.writeToFile(fmt.Sprintln(a...))
 }
 
-func (d *TeeLogger) ErrorF(format string, a ...interface{}) {
-	d.l.ErrorF(format, a...)
+func (d *TeeLogger) ErrorFWithoutLn(format string, a ...interface{}) {
+	d.l.ErrorFWithoutLn(format, a...)
 
 	d.writeToFile(fmt.Sprintf(format, a...))
 }
@@ -143,8 +143,8 @@ func (d *TeeLogger) ErrorLn(a ...interface{}) {
 	d.writeToFile(fmt.Sprintln(a...))
 }
 
-func (d *TeeLogger) DebugF(format string, a ...interface{}) {
-	d.l.DebugF(format, a...)
+func (d *TeeLogger) DebugFWithoutLn(format string, a ...interface{}) {
+	d.l.DebugFWithoutLn(format, a...)
 
 	d.writeToFile(fmt.Sprintf(format, a...))
 }
@@ -179,8 +179,8 @@ func (d *TeeLogger) WarnLn(a ...interface{}) {
 	d.writeToFile(fmt.Sprintln(a...))
 }
 
-func (d *TeeLogger) WarnF(format string, a ...interface{}) {
-	d.l.WarnF(format, a...)
+func (d *TeeLogger) WarnFWithoutLn(format string, a ...interface{}) {
+	d.l.WarnFWithoutLn(format, a...)
 
 	d.writeToFile(fmt.Sprintf(format, a...))
 }

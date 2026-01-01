@@ -107,16 +107,16 @@ type baseLogger interface {
 
 	Process(Process, string, func() error) error
 
-	InfoF(format string, a ...interface{})
+	InfoFWithoutLn(format string, a ...interface{})
 	InfoLn(a ...interface{})
 
-	ErrorF(format string, a ...interface{})
+	ErrorFWithoutLn(format string, a ...interface{})
 	ErrorLn(a ...interface{})
 
-	DebugF(format string, a ...interface{})
+	DebugFWithoutLn(format string, a ...interface{})
 	DebugLn(a ...interface{})
 
-	WarnF(format string, a ...interface{})
+	WarnFWithoutLn(format string, a ...interface{})
 	WarnLn(a ...interface{})
 
 	Success(string)
@@ -129,11 +129,27 @@ type baseLogger interface {
 	ProcessLogger() ProcessLogger
 }
 
+// formatWithNewLineLogger
+// Because we are using pretty printing in dhctl
+// we huge usage InfoF("msg\n") with \n in end of line
+// and often forget to add \n in message
 type formatWithNewLineLogger interface {
-	InfoFLn(format string, a ...any)
-	ErrorFLn(format string, a ...any)
-	DebugFLn(format string, a ...any)
-	WarnFLn(format string, a ...any)
+	// InfoF
+	// Warning! InfoF add \n to end of message.
+	// If you do not have \n to end of message please use InfoFWithoutLn
+	InfoF(format string, a ...any)
+	// ErrorF
+	// Warning! ErrorF add \n to end of message.
+	// If you do not have \n to end of message please use ErrorFWithoutLn
+	ErrorF(format string, a ...any)
+	// DebugF
+	// Warning! DebugF add \n to end of message.
+	// If you do not have \n to end of message please use DebugFWithoutLn
+	DebugF(format string, a ...any)
+	// WarnF
+	// Warning! WarnF add \n to end of message.
+	// If you do not have \n to end of message please use WarnFWithoutLn
+	WarnF(format string, a ...any)
 }
 
 type Logger interface {

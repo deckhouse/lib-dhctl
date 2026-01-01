@@ -80,7 +80,7 @@ func (d *SimpleLogger) Process(p Process, t string, run func() error) error {
 	return err
 }
 
-func (d *SimpleLogger) InfoF(format string, a ...interface{}) {
+func (d *SimpleLogger) InfoFWithoutLn(format string, a ...interface{}) {
 	d.logger.Info(format, a...)
 }
 
@@ -88,7 +88,7 @@ func (d *SimpleLogger) InfoLn(a ...interface{}) {
 	d.logger.Info(listToString(a))
 }
 
-func (d *SimpleLogger) ErrorF(format string, a ...interface{}) {
+func (d *SimpleLogger) ErrorFWithoutLn(format string, a ...interface{}) {
 	d.logger.Error(format, a...)
 }
 
@@ -96,7 +96,7 @@ func (d *SimpleLogger) ErrorLn(a ...interface{}) {
 	d.logger.Error(listToString(a))
 }
 
-func (d *SimpleLogger) DebugF(format string, a ...interface{}) {
+func (d *SimpleLogger) DebugFWithoutLn(format string, a ...interface{}) {
 	if d.isDebug {
 		d.logger.Debug(format, a...)
 	}
@@ -121,7 +121,7 @@ func (d *SimpleLogger) FailRetry(l string) {
 	d.logger.With("status", "FAIL").Warn(l)
 }
 
-func (d *SimpleLogger) WarnF(format string, a ...interface{}) {
+func (d *SimpleLogger) WarnFWithoutLn(format string, a ...interface{}) {
 	d.logger.Warn(format, a...)
 }
 

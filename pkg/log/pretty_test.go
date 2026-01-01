@@ -182,7 +182,7 @@ func testPrettyLoggerProcess(t *testing.T, tst *testPrettyLogger) {
 		inRunMsg := fmt.Sprintf("run in process: %s", string(tst.process))
 
 		err := tst.logger.Process(tst.process, processName, func() error {
-			tst.logger.InfoFLn(inRunMsg)
+			tst.logger.InfoF(inRunMsg)
 			return nil
 		})
 

@@ -117,7 +117,7 @@ func (d *PrettyLogger) Process(p Process, t string, run func() error) error {
 	return d.logboekLogger.LogProcess(format.Title, t).Options(format.OptionsSetter).DoError(run)
 }
 
-func (d *PrettyLogger) InfoF(format string, a ...interface{}) {
+func (d *PrettyLogger) InfoFWithoutLn(format string, a ...interface{}) {
 	d.logboekLogger.Info().LogF(format, a...)
 }
 
@@ -125,7 +125,7 @@ func (d *PrettyLogger) InfoLn(a ...interface{}) {
 	d.logboekLogger.Info().LogLn(a...)
 }
 
-func (d *PrettyLogger) ErrorF(format string, a ...interface{}) {
+func (d *PrettyLogger) ErrorFWithoutLn(format string, a ...interface{}) {
 	d.logboekLogger.Error().LogF(format, a...)
 }
 
@@ -133,7 +133,7 @@ func (d *PrettyLogger) ErrorLn(a ...interface{}) {
 	d.logboekLogger.Error().LogLn(a...)
 }
 
-func (d *PrettyLogger) DebugF(format string, a ...interface{}) {
+func (d *PrettyLogger) DebugFWithoutLn(format string, a ...interface{}) {
 	if d.debugLogWriter != nil {
 		o := fmt.Sprintf(format, a...)
 		_, err := d.debugLogWriter.DebugStream.Write([]byte(o))
@@ -162,11 +162,11 @@ func (d *PrettyLogger) DebugLn(a ...interface{}) {
 }
 
 func (d *PrettyLogger) Success(l string) {
-	d.InfoF("🎉 %s", l)
+	d.InfoFWithoutLn("🎉 %s", l)
 }
 
 func (d *PrettyLogger) Fail(l string) {
-	d.InfoF("️⛱️️ %s", l)
+	d.InfoFWithoutLn("️⛱️️ %s", l)
 }
 
 func (d *PrettyLogger) FailRetry(l string) {
@@ -178,9 +178,9 @@ func (d *PrettyLogger) WarnLn(a ...interface{}) {
 	d.InfoLn(color.New(color.Bold).Sprint(a...))
 }
 
-func (d *PrettyLogger) WarnF(format string, a ...interface{}) {
+func (d *PrettyLogger) WarnFWithoutLn(format string, a ...interface{}) {
 	line := color.New(color.Bold).Sprintf("❗ ~ "+format, a...)
-	d.InfoF(line)
+	d.InfoFWithoutLn(line)
 }
 
 func (d *PrettyLogger) JSON(content []byte) {
@@ -188,7 +188,7 @@ func (d *PrettyLogger) JSON(content []byte) {
 }
 
 func (d *PrettyLogger) Write(content []byte) (int, error) {
-	d.InfoF(string(content))
+	d.InfoFWithoutLn(string(content))
 	return len(content), nil
 }
 

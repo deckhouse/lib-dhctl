@@ -27,20 +27,20 @@ func newFormatWithNewLineLoggerWrapper(parent baseLogger) *formatWithNewLineLogg
 	return &formatWithNewLineLoggerWrapper{parent: parent}
 }
 
-func (w *formatWithNewLineLoggerWrapper) InfoFLn(format string, a ...any) {
-	w.parent.InfoF(addLnToMessage(format, a...))
+func (w *formatWithNewLineLoggerWrapper) InfoF(format string, a ...any) {
+	w.parent.InfoFWithoutLn(addLnToMessage(format, a...))
 }
 
-func (w *formatWithNewLineLoggerWrapper) ErrorFLn(format string, a ...any) {
-	w.parent.ErrorF(addLnToMessage(format, a...))
+func (w *formatWithNewLineLoggerWrapper) ErrorF(format string, a ...any) {
+	w.parent.ErrorFWithoutLn(addLnToMessage(format, a...))
 }
 
-func (w *formatWithNewLineLoggerWrapper) DebugFLn(format string, a ...any) {
-	w.parent.DebugF(addLnToMessage(format, a...))
+func (w *formatWithNewLineLoggerWrapper) DebugF(format string, a ...any) {
+	w.parent.DebugFWithoutLn(addLnToMessage(format, a...))
 }
 
-func (w *formatWithNewLineLoggerWrapper) WarnFLn(format string, a ...any) {
-	w.parent.WarnF(addLnToMessage(format, a...))
+func (w *formatWithNewLineLoggerWrapper) WarnF(format string, a ...any) {
+	w.parent.WarnFWithoutLn(addLnToMessage(format, a...))
 }
 
 func addLnToMessage(format string, a ...any) string {
