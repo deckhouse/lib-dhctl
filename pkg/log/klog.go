@@ -168,7 +168,7 @@ func newKlogWriterWrapper(logger Logger) *klogWriterWrapper {
 }
 
 func (l *klogWriterWrapper) Write(p []byte) (int, error) {
-	l.logger.DebugF("klog: %s", string(p))
+	l.logger.DebugFWithoutLn("klog: %s", string(p))
 
 	return len(p), nil
 }
