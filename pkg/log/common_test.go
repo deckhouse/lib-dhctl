@@ -37,7 +37,7 @@ func assertFollowAllInterfaces(t *testing.T, logger Logger) {
 		assertSilentLoggerProviderFollowFormatLnInterface(t, logger)
 	})
 
-	t.Run("Format Ln logger", func(t *testing.T) {
+	t.Run("Format with Ln logger", func(t *testing.T) {
 		assertFollowFormatLnInterface(t, logger)
 	})
 
@@ -49,18 +49,18 @@ func assertFollowAllInterfaces(t *testing.T, logger Logger) {
 func assertFollowFormatLnInterface(t *testing.T, logger Logger) {
 	runs := []func(){
 		func() {
-			logger.InfoFLn("INFO %s", "test_info")
+			logger.InfoF("INFO %s", "test_info")
 		},
 		func() {
-			logger.WarnFLn("WARN %s", "test_warn")
-		},
-
-		func() {
-			logger.DebugFLn("DEBUG %s", "test_debug")
+			logger.WarnF("WARN %s", "test_warn")
 		},
 
 		func() {
-			logger.ErrorFLn("ERROR %v", fmt.Errorf("test_error"))
+			logger.DebugF("DEBUG %s", "test_debug")
+		},
+
+		func() {
+			logger.ErrorF("ERROR %v", fmt.Errorf("test_error"))
 		},
 	}
 

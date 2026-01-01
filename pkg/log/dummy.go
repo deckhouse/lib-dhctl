@@ -66,7 +66,7 @@ func (d *DummyLogger) Process(_ Process, t string, run func() error) error {
 	return err
 }
 
-func (d *DummyLogger) InfoF(format string, a ...interface{}) {
+func (d *DummyLogger) InfoFWithoutLn(format string, a ...interface{}) {
 	fmt.Printf(format, a...)
 }
 
@@ -74,7 +74,7 @@ func (d *DummyLogger) InfoLn(a ...interface{}) {
 	fmt.Println(a...)
 }
 
-func (d *DummyLogger) ErrorF(format string, a ...interface{}) {
+func (d *DummyLogger) ErrorFWithoutLn(format string, a ...interface{}) {
 	fmt.Printf(format, a...)
 }
 
@@ -82,7 +82,7 @@ func (d *DummyLogger) ErrorLn(a ...interface{}) {
 	fmt.Println(a...)
 }
 
-func (d *DummyLogger) DebugF(format string, a ...interface{}) {
+func (d *DummyLogger) DebugFWithoutLn(format string, a ...interface{}) {
 	if d.isDebug {
 		fmt.Printf(format, a...)
 	}
@@ -110,7 +110,7 @@ func (d *DummyLogger) WarnLn(a ...interface{}) {
 	fmt.Println(a...)
 }
 
-func (d *DummyLogger) WarnF(format string, a ...interface{}) {
+func (d *DummyLogger) WarnFWithoutLn(format string, a ...interface{}) {
 	fmt.Printf(format, a...)
 }
 

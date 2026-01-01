@@ -68,7 +68,7 @@ func (d *SilentLogger) FlushAndClose() error {
 	return nil
 }
 
-func (d *SilentLogger) InfoF(format string, a ...interface{}) {
+func (d *SilentLogger) InfoFWithoutLn(format string, a ...interface{}) {
 	if d.t != nil {
 		d.t.writeToFile(fmt.Sprintf(format, a...))
 	}
@@ -80,7 +80,7 @@ func (d *SilentLogger) InfoLn(a ...interface{}) {
 	}
 }
 
-func (d *SilentLogger) ErrorF(format string, a ...interface{}) {
+func (d *SilentLogger) ErrorFWithoutLn(format string, a ...interface{}) {
 	if d.t != nil {
 		d.t.writeToFile(fmt.Sprintf(format, a...))
 	}
@@ -92,7 +92,7 @@ func (d *SilentLogger) ErrorLn(a ...interface{}) {
 	}
 }
 
-func (d *SilentLogger) DebugF(format string, a ...interface{}) {
+func (d *SilentLogger) DebugFWithoutLn(format string, a ...interface{}) {
 	if d.t != nil {
 		d.t.writeToFile(fmt.Sprintf(format, a...))
 	}
@@ -128,7 +128,7 @@ func (d *SilentLogger) WarnLn(a ...interface{}) {
 	}
 }
 
-func (d *SilentLogger) WarnF(format string, a ...interface{}) {
+func (d *SilentLogger) WarnFWithoutLn(format string, a ...interface{}) {
 	if d.t != nil {
 		d.t.writeToFile(fmt.Sprintf(format, a...))
 	}
