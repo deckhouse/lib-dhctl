@@ -16,6 +16,7 @@ package log
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 
 	"github.com/deckhouse/deckhouse/pkg/log"
@@ -81,7 +82,7 @@ func (d *SimpleLogger) Process(p Process, t string, run func() error) error {
 }
 
 func (d *SimpleLogger) InfoFWithoutLn(format string, a ...interface{}) {
-	d.logger.Info(format, a...)
+	d.logger.Info(fmt.Sprintf(format, a...))
 }
 
 func (d *SimpleLogger) InfoLn(a ...interface{}) {
@@ -89,7 +90,7 @@ func (d *SimpleLogger) InfoLn(a ...interface{}) {
 }
 
 func (d *SimpleLogger) ErrorFWithoutLn(format string, a ...interface{}) {
-	d.logger.Error(format, a...)
+	d.logger.Error(fmt.Sprintf(format, a...))
 }
 
 func (d *SimpleLogger) ErrorLn(a ...interface{}) {
@@ -98,7 +99,7 @@ func (d *SimpleLogger) ErrorLn(a ...interface{}) {
 
 func (d *SimpleLogger) DebugFWithoutLn(format string, a ...interface{}) {
 	if d.isDebug {
-		d.logger.Debug(format, a...)
+		d.logger.Debug(fmt.Sprintf(format, a...))
 	}
 }
 
@@ -122,7 +123,7 @@ func (d *SimpleLogger) FailRetry(l string) {
 }
 
 func (d *SimpleLogger) WarnFWithoutLn(format string, a ...interface{}) {
-	d.logger.Warn(format, a...)
+	d.logger.Warn(fmt.Sprintf(format, a...))
 }
 
 func (d *SimpleLogger) WarnLn(a ...interface{}) {
