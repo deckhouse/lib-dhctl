@@ -14,8 +14,6 @@
 
 package log
 
-import "fmt"
-
 // formatWithNewLineLogger
 // we often use *F function, but for pretty log we use "\n" in end of string
 // this interface and wrapper help us for get rit of this
@@ -28,22 +26,21 @@ func newFormatWithNewLineLoggerWrapper(parent baseLogger) *formatWithNewLineLogg
 }
 
 func (w *formatWithNewLineLoggerWrapper) InfoF(format string, a ...any) {
-	w.parent.InfoFWithoutLn(addLnToMessage(format, a...))
+	w.parent.InfoFWithoutLn(addLnToFormat(format), a...)
 }
 
 func (w *formatWithNewLineLoggerWrapper) ErrorF(format string, a ...any) {
-	w.parent.ErrorFWithoutLn(addLnToMessage(format, a...))
+	w.parent.ErrorFWithoutLn(addLnToFormat(format), a...)
 }
 
 func (w *formatWithNewLineLoggerWrapper) DebugF(format string, a ...any) {
-	w.parent.DebugFWithoutLn(addLnToMessage(format, a...))
+	w.parent.DebugFWithoutLn(addLnToFormat(format), a...)
 }
 
 func (w *formatWithNewLineLoggerWrapper) WarnF(format string, a ...any) {
-	w.parent.WarnFWithoutLn(addLnToMessage(format, a...))
+	w.parent.WarnFWithoutLn(addLnToFormat(format), a...)
 }
 
-func addLnToMessage(format string, a ...any) string {
-	f := format + "\n"
-	return fmt.Sprintf(f, a...)
+func addLnToFormat(format string) string {
+	return format + "\n"
 }
