@@ -15,6 +15,7 @@
 package log
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -38,12 +39,21 @@ func TestLnLoggerWrapper(t *testing.T) {
 	wrapper.ErrorF("Error")
 	assertAddNewLine(t, "Error")
 
+	wrapper.ErrorF("VariablesError %s %v", "msg", true)
+	assertAddNewLine(t, "VariablesError msg true")
+
 	wrapper.WarnF("Warn")
 	assertAddNewLine(t, "Warn")
+
+	wrapper.WarnF("VariablesWarn %s %v", "msg", true)
+	assertAddNewLine(t, "VariablesWarn msg true")
 
 	wrapper.InfoF("Info")
 	assertAddNewLine(t, "Info")
 
-	wrapper.DebugF("Debug")
-	assertAddNewLine(t, "Debug")
+	wrapper.InfoF("VariablesInfo %s %v", "msg", errors.New("error"))
+	assertAddNewLine(t, "VariablesInfo msg error")
+
+	wrapper.DebugF("VariablesDebug %v %s", 42, "msg")
+	assertAddNewLine(t, "VariablesDebug 42 msg")
 }

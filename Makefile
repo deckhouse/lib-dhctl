@@ -60,16 +60,25 @@ go-installed:
 	go version
 
 bin/jq: curl-installed bin
-	curl -sSfL https://github.com/jqlang/jq/releases/download/jq-$(JQ_VERSION)/jq-$(JQ_PLATFORM_ARCH) -o ./bin/jq
-	@chmod +x "./bin/jq"
+	if ! ./hack/check_binary.sh "jq" "--version" "$(JQ_VERSION)" ; then \
+	  echo "Install jq"; \
+	  curl -sSfL https://github.com/jqlang/jq/releases/download/jq-$(JQ_VERSION)/jq-$(JQ_PLATFORM_ARCH) -o ./bin/jq; \
+	  chmod +x "./bin/jq"; \
+	fi
 
 bin/golangci-lint: curl-installed bin
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | BINARY=golangci-lint bash -s -- v${GOLANGCI_VERSION}
-	@chmod +x "./bin/golangci-lint"
+	if ! ./hack/check_binary.sh "golangci-lint" "--version" "$(GOLANGCI_VERSION)"; then \
+  	  echo "Install golangci-lint"; \
+	  curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | BINARY=golangci-lint bash -s -- v${GOLANGCI_VERSION}; \
+	  chmod +x "./bin/golangci-lint"; \
+	fi
 
 bin/gofumpt: curl-installed bin
-	curl -sSfLo "bin/gofumpt" https://github.com/mvdan/gofumpt/releases/download/v$(GOFUMPT_VERSION)/gofumpt_v$(GOFUMPT_VERSION)_$(GOFUMPT_PLATFORM)_$(GOFUMPT_ARCH)
-	@chmod +x "./bin/gofumpt"
+	if ! ./hack/check_binary.sh "gofumpt" "-version" "$(GOFUMPT_VERSION)"; then \
+  	  echo "Install gofumpt"; \
+	  curl -sSfLo "bin/gofumpt" https://github.com/mvdan/gofumpt/releases/download/v$(GOFUMPT_VERSION)/gofumpt_v$(GOFUMPT_VERSION)_$(GOFUMPT_PLATFORM)_$(GOFUMPT_ARCH); \
+	  chmod +x "./bin/gofumpt"; \
+	fi
 
 deps: bin bin/jq bin/golangci-lint bin/gofumpt
 
