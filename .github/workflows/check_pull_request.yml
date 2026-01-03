@@ -37,7 +37,6 @@ jobs:
         run: make test
 
   license_validation:
-    needs: [run_tests]
     name: "Validate that license added to all files"
     runs-on: ubuntu-latest
 
@@ -51,7 +50,6 @@ jobs:
         run: make validation/license
 
   lint:
-    needs: [run_tests, license_validation]
     name: "Lint golang code"
     runs-on: ubuntu-latest
 
