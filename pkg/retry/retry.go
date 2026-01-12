@@ -41,39 +41,31 @@ func IsErr(err error) BreakPredicate {
 	}
 }
 
-type Params interface {
-	WithName(n string) Params
-	WithAttempts(attempts int) Params
-	WithWait(wait time.Duration) Params
-	WithLogger(logger log.Logger) Params
+type ParamsBuilderOpt func(Params)
 
+type Params interface {
 	Name() string
 	Attempts() int
 	Wait() time.Duration
 	Logger() log.Logger
 
-	Clone() Params
-	Fill(c Params) Params
+	Clone(overrides ...ParamsBuilderOpt) Params
 }
 
-type params struct {
-	name     string
-	attempts int
-	wait     time.Duration
-	logger   log.Logger
-}
-
-type ParamsBuilderOpt func(Params)
-
-func WithName(name string) ParamsBuilderOpt {
+func WithName(format string, args ...any) ParamsBuilderOpt {
 	return func(p Params) {
-		p.WithName(name)
+		if format != "" {
+			name := fmt.Sprintf(format, args...)
+			p.(*params).name = name
+		}
 	}
 }
 
 func WithAttempts(attempts int) ParamsBuilderOpt {
 	return func(p Params) {
-		p.WithAttempts(attempts)
+		if attempts > 0 {
+			p.(*params).attempts = attempts
+		}
 	}
 }
 
@@ -84,27 +76,46 @@ func AttemptsWithWaitOpts(attempts int, wait time.Duration) []ParamsBuilderOpt {
 	}
 }
 
+func LoggerWithNameOpts(logger log.Logger, format string, args ...any) []ParamsBuilderOpt {
+	return []ParamsBuilderOpt{
+		WithLogger(logger),
+		WithName(format, args...),
+	}
+}
+
 func WithWait(wait time.Duration) ParamsBuilderOpt {
 	return func(p Params) {
-		p.WithWait(wait)
+		if wait > 0 {
+			p.(*params).wait = wait
+		}
 	}
 }
 
 func WithLogger(logger log.Logger) ParamsBuilderOpt {
 	return func(p Params) {
-		p.WithLogger(logger)
+		if !govalue.IsNil(logger) {
+			p.(*params).logger = logger
+		}
 	}
+}
+
+type params struct {
+	name     string
+	attempts int
+	wait     time.Duration
+	logger   log.Logger
 }
 
 // NewParams
 // Deprecated:
 // use NewEmptyParams with options will be private
 func NewParams(name string, attempts int, wait time.Duration) Params {
-	return NewEmptyParams().
-		WithName(name).
-		WithAttempts(attempts).
-		WithWait(wait).
-		WithLogger(defaultLogger)
+	return NewEmptyParams(
+		WithName("%s", name),
+		WithAttempts(attempts),
+		WithWait(wait),
+		WithLogger(defaultLogger),
+	)
 }
 
 func NewEmptyParams(opts ...ParamsBuilderOpt) Params {
@@ -119,36 +130,6 @@ func NewEmptyParams(opts ...ParamsBuilderOpt) Params {
 		opt(p)
 	}
 
-	return p
-}
-
-func (p *params) WithName(n string) Params {
-	if n != "" {
-		p.name = n
-	}
-
-	return p
-}
-
-func (p *params) WithAttempts(attempts int) Params {
-	if attempts > 0 {
-		p.attempts = attempts
-	}
-
-	return p
-}
-
-func (p *params) WithWait(wait time.Duration) Params {
-	if wait > 0 {
-		p.wait = wait
-	}
-	return p
-}
-
-func (p *params) WithLogger(logger log.Logger) Params {
-	if !govalue.IsNil(logger) {
-		p.logger = logger
-	}
 	return p
 }
 
@@ -168,27 +149,21 @@ func (p *params) Wait() time.Duration {
 	return p.wait
 }
 
-func (p *params) Clone() Params {
+func (p *params) Clone(overrides ...ParamsBuilderOpt) Params {
 	if govalue.IsNil(p) {
 		return nil
 	}
 
-	return NewParams(p.Name(), p.Attempts(), p.Wait()).WithLogger(p.Logger())
-}
-
-func (p *params) Fill(c Params) Params {
-	if govalue.IsNil(p) {
-		return nil
+	cloneOpts := []ParamsBuilderOpt{
+		WithName("%s", p.Name()),
+		WithAttempts(p.Attempts()),
+		WithWait(p.Wait()),
+		WithLogger(p.Logger()),
 	}
 
-	if govalue.IsNil(c) {
-		return p
-	}
+	cloneOpts = append(cloneOpts, overrides...)
 
-	return p.WithName(c.Name()).
-		WithAttempts(c.Attempts()).
-		WithWait(c.Wait()).
-		WithLogger(c.Logger())
+	return NewEmptyParams(cloneOpts...)
 }
 
 func SafeCloneOrNewParams(p Params, opts ...ParamsBuilderOpt) Params {
@@ -217,7 +192,13 @@ type Loop struct {
 // Deprecated:
 // use NewLoopWithParams in futures versions NewLoop will take Params
 func NewLoop(name string, attemptsQuantity int, wait time.Duration) *Loop {
-	p := NewParams(name, attemptsQuantity, wait).WithLogger(defaultLogger)
+	p := NewEmptyParams(
+		WithName("%s", name),
+		WithAttempts(attemptsQuantity),
+		WithWait(wait),
+		WithLogger(defaultLogger),
+	)
+
 	return NewLoopWithParams(p)
 }
 
@@ -247,7 +228,13 @@ func NewLoopWithParamsOpts(opts ...ParamsBuilderOpt) *Loop {
 // Deprecated:
 // use NewSilentLoopWithParams in futures versions NewSilentLoop will take Params
 func NewSilentLoop(name string, attemptsQuantity int, wait time.Duration) *Loop {
-	p := NewParams(name, attemptsQuantity, wait).WithLogger(getDefaultSilentLogger())
+	p := NewEmptyParams(
+		WithName("%s", name),
+		WithAttempts(attemptsQuantity),
+		WithWait(wait),
+		WithLogger(getDefaultSilentLogger()),
+	)
+
 	return NewSilentLoopWithParams(p)
 }
 
@@ -257,13 +244,17 @@ func NewSilentLoopWithParams(params Params) *Loop {
 		p = NewEmptyParams()
 	}
 
-	name := p.Name()
+	logger := p.Logger()
+	if govalue.IsNil(logger) {
+		logger = defaultLogger
+	}
 
+	name := p.Name()
 	return &Loop{
 		name:             name,
 		attemptsQuantity: p.Attempts(),
 		waitTime:         p.Wait(),
-		logger:           p.Logger().SilentLogger(),
+		logger:           logger.SilentLogger(),
 		// - this loop is not interruptable by the signal watcher in tomb package.
 		interruptable: false,
 		showError:     true,
