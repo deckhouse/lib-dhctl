@@ -141,7 +141,7 @@ func TestGlobalDefaultLogger(t *testing.T) {
 
 	const loopName = "some loop"
 
-	loopParamsForCheckLogs := p.Clone().WithName(loopName)
+	loopParamsForCheckLogs := p.Clone(WithName(loopName))
 	require.Equal(t, logger, loopParamsForCheckLogs.Logger())
 
 	// check use default logger
