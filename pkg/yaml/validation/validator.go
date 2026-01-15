@@ -171,16 +171,16 @@ func (v *Validator) Validate(doc *[]byte, opts ...ValidateOption) (*SchemaIndex,
 // validate one document with schema
 // if schema not fount then return ErrSchemaNotFound
 func (v *Validator) ValidateWithIndex(index *SchemaIndex, doc *[]byte, opts ...ValidateOption) error {
-	options := &validateOptions{}
-	for _, opt := range opts {
-		opt(options)
-	}
-
 	if !index.IsValid() {
 		return fmt.Errorf(
 			"document must contain \"kind\" and \"apiVersion\" fields:\n\tapiVersion: %s\n\tkind: %s\n\n%s",
 			index.Version, index.Kind, string(*doc),
 		)
+	}
+
+	options := &validateOptions{}
+	for _, opt := range opts {
+		opt(options)
 	}
 
 	logger := log.SafeProvideLogger(v.loggerProvider)

@@ -15,6 +15,7 @@
 package validation
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -37,7 +38,6 @@ apiVersions:
     anyOf:
       - required: [apiVersion, kind, sshUser, sshAgentPrivateKeys]
       - required: [apiVersion, kind, sshUser, sudoPassword]
-    x-rules: [sshPrivateKey]
     properties:
       kind:
         type: string
@@ -61,7 +61,7 @@ apiVersions:
           type: object
           additionalProperties: false
           required: [key]
-          x-rules: [sshPrivateKey]
+          x-rules: [passphrase]
           properties:
             key:
               type: string
@@ -324,6 +324,107 @@ sshPort: 22456
 				assertValidationWithTransformers(t, validator, false)
 			})
 		})
+
+		t.Run("with extensions", func(t *testing.T) {
+			tests := []struct {
+				name        string
+				keyPassword string
+				shouldError bool
+			}{
+				{
+					name:        "invalid value",
+					keyPassword: `["a", "b"]`,
+					shouldError: true,
+				},
+
+				{
+					name:        "value does not valid password string",
+					keyPassword: `"not secret"`,
+					shouldError: true,
+				},
+
+				{
+					name:        "valid password string",
+					keyPassword: `"!not@secret."`,
+					shouldError: false,
+				},
+			}
+
+			for _, test := range tests {
+				t.Run(test.name, func(t *testing.T) {
+					assertPassphraseExtensions(
+						t,
+						getValidatorTestKind(t),
+						test.keyPassword,
+						test.shouldError,
+					)
+				})
+			}
+		})
+
+		t.Run("error case", func(t *testing.T) {
+			tests := []struct {
+				name         string
+				doc          string
+				errSubstring string
+				opts         []ValidateOption
+			}{
+				{
+					name:         "invalid yaml",
+					doc:          `{invalid`,
+					errSubstring: "error converting YAML to JSON: yaml: line 1",
+				},
+				{
+					name: "no schema fields",
+					doc: `
+sshUser: ubuntu
+sudoPassword: "no secret"
+sshPort: 22456
+`,
+					errSubstring: `document must contain "kind" and "apiVersion"`,
+				},
+				{
+					name: "no schema found",
+					doc: `
+apiVersion: some
+kind: MyKind
+sshUser: ubuntu
+sudoPassword: "no secret"
+sshPort: 22456
+`,
+					errSubstring: ErrSchemaNotFound.Error(),
+				},
+				{
+					name: "not valid by schema",
+					doc: `
+apiVersion: deckhouse.io/v1
+kind: TestKind
+sshUser: ubuntu
+sshPort: "port"
+sshAgentPrivateKeys: {"a": "b"}
+`,
+					errSubstring: "Document validation failed:\n---",
+				},
+				{
+					name: "not valid by schema no pretty error",
+					doc: `
+apiVersion: deckhouse.io/v1
+kind: TestKind
+sshUser: ubuntu
+sshPort: "port"
+sshAgentPrivateKeys: {"a": "b"}
+`,
+					errSubstring: `"TestKind, deckhouse.io/v1" document validation failed:`,
+					opts:         []ValidateOption{ValidateWithNoPrettyError(true)},
+				},
+			}
+
+			for _, test := range tests {
+				t.Run(test.name, func(t *testing.T) {
+					asserNoValidateTestKind(t, getValidatorTestKind(t), test.doc, test.errSubstring, test.opts...)
+				})
+			}
+		})
 	})
 }
 
@@ -415,10 +516,12 @@ func doValidate(t *testing.T, validator *Validator, expectedIndex SchemaIndex, d
 		opts = []ValidateOption{ValidateWithNoPrettyError(true)}
 	}
 
+	bytesForError := []byte(doc)
 	bytesValidateWithIndex := []byte(doc)
 	err := validator.ValidateWithIndex(&index, &bytesValidateWithIndex, opts...)
 	if shouldError {
 		require.Error(t, err, "should validation error for test another kind")
+		require.Equal(t, bytesForError, bytesValidateWithIndex, "should not change input")
 		return nil
 	}
 	require.NoError(t, err, "should not validation error for test another kind")
@@ -462,6 +565,17 @@ func asserValidateTestKind(t *testing.T, validator *Validator, doc string, shoul
 	asserTestKind(t, bytes, expected)
 }
 
+func asserNoValidateTestKind(t *testing.T, validator *Validator, doc string, errorSubstring string, opts ...ValidateOption) {
+	bytesForError := []byte(doc)
+	bytesValidateWithIndex := []byte(doc)
+
+	_, err := validator.Validate(&bytesValidateWithIndex, opts...)
+
+	require.Error(t, err, "should not validate")
+	require.Equal(t, bytesForError, bytesValidateWithIndex, "should not change input")
+	require.Contains(t, err.Error(), errorSubstring)
+}
+
 func assertValidationWithTransformers(t *testing.T, validator *Validator, shouldError bool) {
 	doc := `
 apiVersion: test
@@ -490,4 +604,47 @@ value:
 	require.Contains(t, obj, "value")
 	value := obj["value"].(map[string]any)
 	require.Equal(t, value["additionalPropertyInvalidWithTransformer"], "invalid", "additional field should present")
+}
+
+func assertPassphraseExtensions(t *testing.T, validator *Validator, keyPassword string, shouldError bool) {
+	validators := map[string]ExtensionsValidatorHandler{
+		"passphrase": func(oldValue json.RawMessage) error {
+			key := testPrivateKey{}
+			err := json.Unmarshal(oldValue, &key)
+			if err != nil {
+				return err
+			}
+
+			shouldPresent := ".!@"
+
+			if !strings.ContainsAny(key.Passphrase, shouldPresent) {
+				return fmt.Errorf("invalid passphrase: should contain %s", shouldPresent)
+			}
+
+			return nil
+		},
+	}
+
+	validator.AddExtensionsValidators(NewXRulesExtensionsValidator(validators))
+
+	doc := fmt.Sprintf(`
+apiVersion: deckhouse.io/v1
+kind: TestKind
+sshUser: ubuntu
+sshPort: 2200
+sshAgentPrivateKeys:
+- key: "mykey"
+  passphrase: %s
+`, keyPassword)
+
+	asserValidateTestKind(t, validator, doc, shouldError, &testKind{
+		SSHUser: "ubuntu",
+		SSHPort: 2200,
+		SSHAgentPrivateKeys: []testPrivateKey{
+			{
+				Key:        "mykey",
+				Passphrase: strings.Trim(keyPassword, `"`),
+			},
+		},
+	})
 }
