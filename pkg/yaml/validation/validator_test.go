@@ -20,12 +20,404 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/deckhouse/lib-dhctl/pkg/log"
-	"github.com/deckhouse/lib-dhctl/pkg/yaml/validation/transformer"
 	"github.com/go-openapi/spec"
 	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/yaml"
+
+	"github.com/deckhouse/lib-dhctl/pkg/log"
+	"github.com/deckhouse/lib-dhctl/pkg/yaml/validation/transformer"
 )
+
+func TestOneSchemaValidator(t *testing.T) {
+	logger := testGetLogger()
+
+	getValidatorTestKind := func(t *testing.T) *Validator {
+		validator := NewValidator(nil).SetLogger(logger)
+		err := validator.LoadSchemas(strings.NewReader(testSchemaTestKind))
+		require.NoError(t, err, "failed to load schema")
+		return validator
+	}
+
+	getValidatorAnotherTestKind := func(t *testing.T) *Validator {
+		validator := NewValidator(nil).SetLogger(logger)
+		err := validator.LoadSchemas(strings.NewReader(testSchemaAnotherTestKind))
+		require.NoError(t, err, "failed to load schema")
+		return validator
+	}
+
+	t.Run("happy case", func(t *testing.T) {
+		validatorTestKind := getValidatorTestKind(t)
+
+		docPassword := `
+apiVersion: deckhouse.io/v1
+kind: TestKind
+sshUser: ubuntu
+sudoPassword: "no secret"
+sshPort: 2200
+`
+		bytesValidate := []byte(docPassword)
+		index, err := validatorTestKind.Validate(&bytesValidate, ValidateWithNoPrettyError(true))
+		require.NoError(t, err)
+		asserTestKindIndex(t, *index)
+
+		expectedTestKind := &testKind{
+			SchemaIndex:  indexTestKind,
+			SSHUser:      "ubuntu",
+			SudoPassword: "no secret",
+			SSHPort:      2200,
+		}
+
+		asserTestKind(t, bytesValidate, expectedTestKind)
+
+		asserValidateTestKind(t, validatorTestKind, docPassword, false, expectedTestKind)
+
+		docKey := `
+apiVersion: deckhouse.io/v1
+kind: TestKind
+sshUser: ubuntu
+sshPort: 2200
+sshAgentPrivateKeys:
+- key: "mykey"
+`
+		asserValidateTestKind(t, validatorTestKind, docKey, false, &testKind{
+			SSHUser: "ubuntu",
+			SSHPort: 2200,
+			SSHAgentPrivateKeys: []testPrivateKey{
+				{Key: "mykey"},
+			},
+		})
+	})
+
+	t.Run("set defaults", func(t *testing.T) {
+		doc := `
+apiVersion: deckhouse.io/v1
+kind: TestKind
+sshUser: ubuntu
+sudoPassword: "no secret"
+`
+
+		asserValidateTestKind(t, getValidatorTestKind(t), doc, false, &testKind{
+			SSHUser:      "ubuntu",
+			SudoPassword: "no secret",
+			SSHPort:      22,
+		})
+
+		anotherTestKindDoc := `
+apiVersion: test
+kind: AnotherTestKind
+key: "mykey"
+`
+		asserValidateAnotherTestKind(
+			t,
+			getValidatorAnotherTestKind(t),
+			anotherTestKindDoc,
+			false,
+			&testAnotherKind{
+				Key: "mykey",
+				Value: testAnotherKindValue{
+					ValueEnum: "AWS",
+					ValueBool: true,
+				},
+			})
+	})
+
+	t.Run("version fallback", func(t *testing.T) {
+		validatorTestKind := getValidatorTestKind(t).
+			AddVersionFallback("test", indexTestKind.Version)
+		// copy
+		index := indexTestKind
+		index.Version = "test"
+
+		doc := `
+apiVersion: deckhouse.io/v1
+kind: TestKind
+sshUser: ubuntu
+sudoPassword: "no secret"
+`
+
+		bytesValidateWithIndex := []byte(doc)
+		err := validatorTestKind.ValidateWithIndex(&index, &bytesValidateWithIndex)
+		require.NoError(t, err)
+		asserTestKindIndex(t, index)
+	})
+
+	t.Run("prevalidator", func(t *testing.T) {
+		t.Run("doc valid", func(t *testing.T) {
+			doc := `
+apiVersion: deckhouse.io/v1
+kind: TestKind
+sshUser: ubuntu
+sudoPassword: "no secret"
+sshPort: 22456
+`
+			validator := getValidatorTestKind(t)
+			validator.AddPreValidator(indexTestKind, newTestKindPreValidator(t, ""))
+
+			asserValidateTestKind(t, validator, doc, false, &testKind{
+				SSHUser:      "ubuntu",
+				SudoPassword: "no secret",
+				SSHPort:      22456,
+			})
+		})
+
+		t.Run("doc invalid", func(t *testing.T) {
+			doc := `
+apiVersion: deckhouse.io/v1
+kind: TestKind
+sshUser: ubuntu
+sudoPassword: "no secret"
+sshPort: 23
+`
+			validator := getValidatorTestKind(t)
+			validator.AddPreValidator(indexTestKind, newTestKindPreValidator(t, ""))
+
+			asserValidateTestKind(t, validator, doc, true, nil)
+		})
+
+		t.Run("our schema valid", func(t *testing.T) {
+			doc := `
+apiVersion: deckhouse.io/v1
+kind: TestKind
+sshUser: ubuntu
+sudoPassword: "no secret"
+sshPort: 22456
+`
+			validator := NewValidator(nil)
+			validator.SetLogger(logger)
+
+			validator.AddPreValidator(indexTestKind, newTestKindPreValidator(t, testSchemaTestKind))
+
+			asserValidateTestKind(t, validator, doc, false, &testKind{
+				SSHUser:      "ubuntu",
+				SudoPassword: "no secret",
+				SSHPort:      22456,
+			})
+		})
+
+		t.Run("our schema invalid", func(t *testing.T) {
+			doc := `
+apiVersion: deckhouse.io/v1
+kind: TestKind
+sshUser: ubuntu
+sudoPassword: "no secret"
+sshPort: 22456
+`
+			validator := NewValidator(nil)
+			validator.SetLogger(logger)
+
+			validator.AddPreValidator(indexTestKind, newTestKindPreValidator(t, testSchemaAnotherTestKind))
+
+			asserValidateTestKind(t, validator, doc, true, nil)
+		})
+	})
+
+	t.Run("add transformers", func(t *testing.T) {
+		t.Run("for index", func(t *testing.T) {
+			validator := getValidatorAnotherTestKind(t)
+			validator.AddTransformers(
+				indexAnotherTestKind,
+				transformer.NewAdditionalPropertiesTransformerDisallowFull(),
+			)
+
+			assertValidationWithTransformers(t, validator, true)
+		})
+
+		t.Run("default", func(t *testing.T) {
+			validator := getValidatorAnotherTestKind(t)
+			validator.SetDefaultTransformers(
+				transformer.NewAdditionalPropertiesTransformerDisallowFull(),
+			)
+
+			assertValidationWithTransformers(t, validator, true)
+		})
+
+		t.Run("additional properties enabled is set in schema", func(t *testing.T) {
+			validator := getValidatorAnotherTestKind(t)
+			validator.SetDefaultTransformers(
+				transformer.NewAdditionalPropertiesTransformer(),
+			)
+
+			assertValidationWithTransformers(t, validator, false)
+		})
+	})
+
+	t.Run("with extensions", func(t *testing.T) {
+		tests := []struct {
+			name        string
+			keyPassword string
+			shouldError bool
+		}{
+			{
+				name:        "invalid value",
+				keyPassword: `["a", "b"]`,
+				shouldError: true,
+			},
+
+			{
+				name:        "value does not valid password string",
+				keyPassword: `"not secret"`,
+				shouldError: true,
+			},
+
+			{
+				name:        "valid password string",
+				keyPassword: `"!not@secret."`,
+				shouldError: false,
+			},
+		}
+
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				assertPassphraseExtensions(
+					t,
+					getValidatorTestKind(t),
+					test.keyPassword,
+					test.shouldError,
+				)
+			})
+		}
+	})
+
+	t.Run("error case", func(t *testing.T) {
+		tests := []struct {
+			name         string
+			doc          string
+			errSubstring string
+			opts         []ValidateOption
+		}{
+			{
+				name:         "invalid yaml",
+				doc:          `{invalid`,
+				errSubstring: "error converting YAML to JSON: yaml: line 1",
+			},
+			{
+				name: "no schema fields",
+				doc: `
+sshUser: ubuntu
+sudoPassword: "no secret"
+sshPort: 22456
+`,
+				errSubstring: `document must contain "kind" and "apiVersion"`,
+			},
+			{
+				name: "no schema found",
+				doc: `
+apiVersion: some
+kind: MyKind
+sshUser: ubuntu
+sudoPassword: "no secret"
+sshPort: 22456
+`,
+				errSubstring: ErrSchemaNotFound.Error(),
+			},
+			{
+				name: "not valid by schema",
+				doc: `
+apiVersion: deckhouse.io/v1
+kind: TestKind
+sshUser: ubuntu
+sshPort: "port"
+sshAgentPrivateKeys: {"a": "b"}
+`,
+				errSubstring: "Document validation failed:\n---",
+			},
+			{
+				name: "not valid by schema no pretty error",
+				doc: `
+apiVersion: deckhouse.io/v1
+kind: TestKind
+sshUser: ubuntu
+sshPort: "port"
+sshAgentPrivateKeys: {"a": "b"}
+`,
+				errSubstring: `"TestKind, deckhouse.io/v1" document validation failed:`,
+				opts:         []ValidateOption{ValidateWithNoPrettyError(true)},
+			},
+		}
+
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				asserNoValidateTestKind(t, getValidatorTestKind(t), test.doc, test.errSubstring, test.opts...)
+			})
+		}
+	})
+}
+
+func TestMultipleSchemasValidator(t *testing.T) {
+	logger := testGetLogger()
+
+	testKindSchemas, err := LoadSchemas(strings.NewReader(testSchemaTestKind))
+	require.NoError(t, err)
+
+	initMap := make(map[SchemaIndex]*spec.Schema)
+	for _, schema := range testKindSchemas {
+		initMap[schema.Index] = schema.Schema
+	}
+
+	validator := NewValidator(initMap).SetLogger(logger)
+
+	testAnotherKindSchemas, err := LoadSchemas(strings.NewReader(testSchemaAnotherTestKind))
+	require.NoError(t, err)
+	for _, schema := range testAnotherKindSchemas {
+		validator.AddSchema(schema.Index, schema.Schema)
+	}
+
+	tests := []struct {
+		name        string
+		doc         string
+		shouldError bool
+	}{
+		{
+			name: "test kind validate",
+			doc: `
+apiVersion: deckhouse.io/v1
+kind: TestKind
+sshUser: ubuntu
+sudoPassword: "no secret"
+sshPort: 2200
+`,
+			shouldError: false,
+		},
+
+		{
+			name: "another test kind validate",
+			doc: `
+apiVersion: test
+kind: AnotherTestKind
+key: "mykey"
+value:
+  valueEnum: "OpenStack"
+  valueBool: false
+`,
+			shouldError: false,
+		},
+
+		{
+			name: "not present schema",
+			doc: `
+apiVersion: my
+kind: MyKind
+key: "key"
+value: 1
+`,
+			shouldError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			bytes := []byte(test.doc)
+			_, err := validator.Validate(&bytes)
+
+			assertError := require.NoError
+			if test.shouldError {
+				assertError = require.Error
+			}
+
+			assertError(t, err)
+		})
+	}
+}
 
 const (
 	testSchemaTestKind = `
@@ -110,323 +502,6 @@ var (
 		Version: "test",
 	}
 )
-
-func TestValidator(t *testing.T) {
-	t.Run("One schema", func(t *testing.T) {
-		logger := testGetLogger()
-
-		getValidatorTestKind := func(t *testing.T) *Validator {
-			validator := NewValidator(nil).SetLogger(logger)
-			err := validator.LoadSchemas(strings.NewReader(testSchemaTestKind))
-			require.NoError(t, err, "failed to load schema")
-			return validator
-		}
-
-		getValidatorAnotherTestKind := func(t *testing.T) *Validator {
-			validator := NewValidator(nil).SetLogger(logger)
-			err := validator.LoadSchemas(strings.NewReader(testSchemaAnotherTestKind))
-			require.NoError(t, err, "failed to load schema")
-			return validator
-		}
-
-		t.Run("happy case", func(t *testing.T) {
-			validatorTestKind := getValidatorTestKind(t)
-
-			docPassword := `
-apiVersion: deckhouse.io/v1
-kind: TestKind
-sshUser: ubuntu
-sudoPassword: "no secret"
-sshPort: 2200
-`
-			bytesValidate := []byte(docPassword)
-			index, err := validatorTestKind.Validate(&bytesValidate, ValidateWithNoPrettyError(true))
-			require.NoError(t, err)
-			asserTestKindIndex(t, *index)
-
-			expectedTestKind := &testKind{
-				SchemaIndex:  indexTestKind,
-				SSHUser:      "ubuntu",
-				SudoPassword: "no secret",
-				SSHPort:      2200,
-			}
-
-			asserTestKind(t, bytesValidate, expectedTestKind)
-
-			asserValidateTestKind(t, validatorTestKind, docPassword, false, expectedTestKind)
-
-			docKey := `
-apiVersion: deckhouse.io/v1
-kind: TestKind
-sshUser: ubuntu
-sshPort: 2200
-sshAgentPrivateKeys:
-- key: "mykey"
-`
-			asserValidateTestKind(t, validatorTestKind, docKey, false, &testKind{
-				SSHUser: "ubuntu",
-				SSHPort: 2200,
-				SSHAgentPrivateKeys: []testPrivateKey{
-					{Key: "mykey"},
-				},
-			})
-		})
-
-		t.Run("set defaults", func(t *testing.T) {
-			doc := `
-apiVersion: deckhouse.io/v1
-kind: TestKind
-sshUser: ubuntu
-sudoPassword: "no secret"
-`
-
-			asserValidateTestKind(t, getValidatorTestKind(t), doc, false, &testKind{
-				SSHUser:      "ubuntu",
-				SudoPassword: "no secret",
-				SSHPort:      22,
-			})
-
-			anotherTestKindDoc := `
-apiVersion: test
-kind: AnotherTestKind
-key: "mykey"
-`
-			asserValidateAnotherTestKind(
-				t,
-				getValidatorAnotherTestKind(t),
-				anotherTestKindDoc,
-				false,
-				&testAnotherKind{
-					Key: "mykey",
-					Value: testAnotherKindValue{
-						ValueEnum: "AWS",
-						ValueBool: true,
-					},
-				})
-		})
-
-		t.Run("version fallback", func(t *testing.T) {
-			validatorTestKind := getValidatorTestKind(t).
-				AddVersionFallback("test", indexTestKind.Version)
-			// copy
-			index := indexTestKind
-			index.Version = "test"
-
-			doc := `
-apiVersion: deckhouse.io/v1
-kind: TestKind
-sshUser: ubuntu
-sudoPassword: "no secret"
-`
-
-			bytesValidateWithIndex := []byte(doc)
-			err := validatorTestKind.ValidateWithIndex(&index, &bytesValidateWithIndex)
-			require.NoError(t, err)
-			asserTestKindIndex(t, index)
-		})
-
-		t.Run("prevalidator", func(t *testing.T) {
-			t.Run("doc valid", func(t *testing.T) {
-				doc := `
-apiVersion: deckhouse.io/v1
-kind: TestKind
-sshUser: ubuntu
-sudoPassword: "no secret"
-sshPort: 22456
-`
-				validator := getValidatorTestKind(t)
-				validator.AddPreValidator(indexTestKind, newTestKindPreValidator(t, ""))
-
-				asserValidateTestKind(t, validator, doc, false, &testKind{
-					SSHUser:      "ubuntu",
-					SudoPassword: "no secret",
-					SSHPort:      22456,
-				})
-			})
-
-			t.Run("doc invalid", func(t *testing.T) {
-				doc := `
-apiVersion: deckhouse.io/v1
-kind: TestKind
-sshUser: ubuntu
-sudoPassword: "no secret"
-sshPort: 23
-`
-				validator := getValidatorTestKind(t)
-				validator.AddPreValidator(indexTestKind, newTestKindPreValidator(t, ""))
-
-				asserValidateTestKind(t, validator, doc, true, nil)
-			})
-
-			t.Run("our schema valid", func(t *testing.T) {
-				doc := `
-apiVersion: deckhouse.io/v1
-kind: TestKind
-sshUser: ubuntu
-sudoPassword: "no secret"
-sshPort: 22456
-`
-				validator := NewValidator(nil)
-				validator.SetLogger(logger)
-
-				validator.AddPreValidator(indexTestKind, newTestKindPreValidator(t, testSchemaTestKind))
-
-				asserValidateTestKind(t, validator, doc, false, &testKind{
-					SSHUser:      "ubuntu",
-					SudoPassword: "no secret",
-					SSHPort:      22456,
-				})
-			})
-
-			t.Run("our schema invalid", func(t *testing.T) {
-				doc := `
-apiVersion: deckhouse.io/v1
-kind: TestKind
-sshUser: ubuntu
-sudoPassword: "no secret"
-sshPort: 22456
-`
-				validator := NewValidator(nil)
-				validator.SetLogger(logger)
-
-				validator.AddPreValidator(indexTestKind, newTestKindPreValidator(t, testSchemaAnotherTestKind))
-
-				asserValidateTestKind(t, validator, doc, true, nil)
-			})
-		})
-
-		t.Run("add transformers", func(t *testing.T) {
-			t.Run("for index", func(t *testing.T) {
-				validator := getValidatorAnotherTestKind(t)
-				validator.AddTransformers(
-					indexAnotherTestKind,
-					transformer.NewAdditionalPropertiesTransformerDisallowFull(),
-				)
-
-				assertValidationWithTransformers(t, validator, true)
-			})
-
-			t.Run("default", func(t *testing.T) {
-				validator := getValidatorAnotherTestKind(t)
-				validator.SetDefaultTransformers(
-					transformer.NewAdditionalPropertiesTransformerDisallowFull(),
-				)
-
-				assertValidationWithTransformers(t, validator, true)
-			})
-
-			t.Run("additional properties enabled is set in schema", func(t *testing.T) {
-				validator := getValidatorAnotherTestKind(t)
-				validator.SetDefaultTransformers(
-					transformer.NewAdditionalPropertiesTransformer(),
-				)
-
-				assertValidationWithTransformers(t, validator, false)
-			})
-		})
-
-		t.Run("with extensions", func(t *testing.T) {
-			tests := []struct {
-				name        string
-				keyPassword string
-				shouldError bool
-			}{
-				{
-					name:        "invalid value",
-					keyPassword: `["a", "b"]`,
-					shouldError: true,
-				},
-
-				{
-					name:        "value does not valid password string",
-					keyPassword: `"not secret"`,
-					shouldError: true,
-				},
-
-				{
-					name:        "valid password string",
-					keyPassword: `"!not@secret."`,
-					shouldError: false,
-				},
-			}
-
-			for _, test := range tests {
-				t.Run(test.name, func(t *testing.T) {
-					assertPassphraseExtensions(
-						t,
-						getValidatorTestKind(t),
-						test.keyPassword,
-						test.shouldError,
-					)
-				})
-			}
-		})
-
-		t.Run("error case", func(t *testing.T) {
-			tests := []struct {
-				name         string
-				doc          string
-				errSubstring string
-				opts         []ValidateOption
-			}{
-				{
-					name:         "invalid yaml",
-					doc:          `{invalid`,
-					errSubstring: "error converting YAML to JSON: yaml: line 1",
-				},
-				{
-					name: "no schema fields",
-					doc: `
-sshUser: ubuntu
-sudoPassword: "no secret"
-sshPort: 22456
-`,
-					errSubstring: `document must contain "kind" and "apiVersion"`,
-				},
-				{
-					name: "no schema found",
-					doc: `
-apiVersion: some
-kind: MyKind
-sshUser: ubuntu
-sudoPassword: "no secret"
-sshPort: 22456
-`,
-					errSubstring: ErrSchemaNotFound.Error(),
-				},
-				{
-					name: "not valid by schema",
-					doc: `
-apiVersion: deckhouse.io/v1
-kind: TestKind
-sshUser: ubuntu
-sshPort: "port"
-sshAgentPrivateKeys: {"a": "b"}
-`,
-					errSubstring: "Document validation failed:\n---",
-				},
-				{
-					name: "not valid by schema no pretty error",
-					doc: `
-apiVersion: deckhouse.io/v1
-kind: TestKind
-sshUser: ubuntu
-sshPort: "port"
-sshAgentPrivateKeys: {"a": "b"}
-`,
-					errSubstring: `"TestKind, deckhouse.io/v1" document validation failed:`,
-					opts:         []ValidateOption{ValidateWithNoPrettyError(true)},
-				},
-			}
-
-			for _, test := range tests {
-				t.Run(test.name, func(t *testing.T) {
-					asserNoValidateTestKind(t, getValidatorTestKind(t), test.doc, test.errSubstring, test.opts...)
-				})
-			}
-		})
-	})
-}
 
 func testGetLogger() log.LoggerProvider {
 	return log.SimpleLoggerProvider(
