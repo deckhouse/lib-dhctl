@@ -16,8 +16,6 @@ package validation
 
 import (
 	"fmt"
-
-	"github.com/go-openapi/spec"
 )
 
 type SchemaIndex struct {
@@ -32,5 +30,3 @@ func (i *SchemaIndex) IsValid() bool {
 func (i *SchemaIndex) String() string {
 	return fmt.Sprintf("%s, %s", i.Kind, i.Version)
 }
-
-var s spec.Schema
