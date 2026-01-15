@@ -14,6 +14,8 @@
 
 package log
 
+import "strings"
+
 // formatWithNewLineLogger
 // we often use *F function, but for pretty log we use "\n" in end of string
 // this interface and wrapper help us for get rit of this
@@ -42,5 +44,5 @@ func (w *formatWithNewLineLoggerWrapper) WarnF(format string, a ...any) {
 }
 
 func addLnToFormat(format string) string {
-	return format + "\n"
+	return strings.TrimRight(format, "\n") + "\n"
 }

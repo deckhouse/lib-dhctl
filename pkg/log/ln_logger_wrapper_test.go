@@ -25,13 +25,15 @@ import (
 func TestLnLoggerWrapper(t *testing.T) {
 	logger := NewInMemoryLoggerWithParent(NewSimpleLogger(LoggerOptions{IsDebug: true}))
 
-	assertAddNewLine := func(t *testing.T, msg string) {
+	assertAddNewLine := func(t *testing.T, msg string) string {
 		matches, err := logger.AllMatches(&Match{
 			Prefix: []string{fmt.Sprintf("%s\n", msg)},
 		})
 
 		require.NoError(t, err)
 		require.Len(t, matches, 1, msg)
+
+		return matches[0]
 	}
 
 	wrapper := newFormatWithNewLineLoggerWrapper(logger)
@@ -53,6 +55,11 @@ func TestLnLoggerWrapper(t *testing.T) {
 
 	wrapper.InfoF("VariablesInfo %s %v", "msg", errors.New("error"))
 	assertAddNewLine(t, "VariablesInfo msg error")
+
+	// cut new line from format
+	wrapper.InfoF("Format with new line %d\n", 42)
+	match := assertAddNewLine(t, "Format with new line 42")
+	require.Equal(t, "Format with new line 42\n", match)
 
 	wrapper.DebugF("VariablesDebug %v %s", 42, "msg")
 	assertAddNewLine(t, "VariablesDebug 42 msg")
