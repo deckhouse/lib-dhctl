@@ -15,6 +15,7 @@
 package validation
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -30,6 +31,46 @@ const (
 	ErrRead
 	ErrUnknown
 )
+
+var validationErrors = []ErrorKind{
+	ErrKindChangesValidationFailed,
+	ErrKindValidationFailed,
+	ErrKindInvalidYAML,
+	ErrDocumentValidationFailed,
+	ErrSchemaNotFound,
+	ErrRead,
+	ErrUnknown,
+}
+
+// ExtractValidationErrors
+// extract all validation errors from error
+// if no any error extracted returns slice with ErrUnknown
+func ExtractValidationErrors(err error) []ErrorKind {
+	result := make([]ErrorKind, 0, 2)
+	for _, e := range validationErrors {
+		if errors.Is(err, e) {
+			result = append(result, e)
+		}
+	}
+
+	if len(result) == 0 {
+		result = append(result, ErrUnknown)
+	}
+
+	return result
+}
+
+// ExtractValidationError
+// extract first validation error from error
+// if no any error extracted returns ErrUnknown
+func ExtractValidationError(err error) ErrorKind {
+	errs := ExtractValidationErrors(err)
+	if len(errs) > 0 {
+		return errs[0]
+	}
+
+	return ErrUnknown
+}
 
 func (k ErrorKind) Error() string {
 	return k.String()
