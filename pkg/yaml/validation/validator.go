@@ -15,6 +15,7 @@
 package validation
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -152,15 +153,13 @@ func (v *Validator) Get(index *SchemaIndex) *spec.Schema {
 }
 
 func (v *Validator) Validate(doc *[]byte, opts ...ValidateOption) (*SchemaIndex, error) {
-	var index SchemaIndex
-
-	err := yaml.Unmarshal(*doc, &index)
+	// no validate for valid. checking in one place in ValidateWithIndex
+	index, err := ParseIndex(bytes.NewReader(*doc), parseIndexNoCheckValidOpt)
 	if err != nil {
-		return nil, fmt.Errorf("%w %w: schema index unmarshal failed: %w", ErrKindValidationFailed, ErrKindInvalidYAML, err)
+		return nil, err
 	}
 
-	err = v.ValidateWithIndex(&index, doc, opts...)
-	return &index, err
+	return index, v.ValidateWithIndex(index, doc, opts...)
 }
 
 // ValidateWithIndex
@@ -168,10 +167,7 @@ func (v *Validator) Validate(doc *[]byte, opts ...ValidateOption) (*SchemaIndex,
 // if schema not fount then return ErrSchemaNotFound
 func (v *Validator) ValidateWithIndex(index *SchemaIndex, doc *[]byte, opts ...ValidateOption) error {
 	if !index.IsValid() {
-		return fmt.Errorf(
-			"%w: document must contain \"kind\" and \"apiVersion\" fields:\n\tapiVersion: %s\n\tkind: %s\n\n%s",
-			ErrKindValidationFailed, index.Version, index.Kind, string(*doc),
-		)
+		return index.invalidIndexErr(*doc)
 	}
 
 	options := &validateOptions{}
