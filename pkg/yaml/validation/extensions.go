@@ -87,14 +87,14 @@ func (v *ExtensionsValidator) Validate(data json.RawMessage, schema spec.Schema)
 }
 
 func (v *ExtensionsValidator) validateData(data json.RawMessage, schema spec.Schema) error {
-	if xRules, ok := schema.Extensions.GetStringSlice(v.name); ok {
-		for _, rule := range xRules {
-			xValidator, ok := v.validators[rule]
+	if rules, ok := schema.Extensions.GetStringSlice(v.name); ok {
+		for _, rule := range rules {
+			validator, ok := v.validators[rule]
 			if !ok {
 				continue
 			}
 
-			err := xValidator(data)
+			err := validator(data)
 			if err != nil {
 				return err
 			}
@@ -102,9 +102,9 @@ func (v *ExtensionsValidator) validateData(data json.RawMessage, schema spec.Sch
 	}
 
 	if schema.SchemaProps.Items != nil && schema.SchemaProps.Items.Schema != nil {
-		if xRules, ok := schema.SchemaProps.Items.Schema.Extensions.GetStringSlice(v.name); ok {
-			for _, rule := range xRules {
-				xValidator, ok := v.validators[rule]
+		if rules, ok := schema.SchemaProps.Items.Schema.Extensions.GetStringSlice(v.name); ok {
+			for _, rule := range rules {
+				validator, ok := v.validators[rule]
 				if !ok {
 					continue
 				}
@@ -121,7 +121,7 @@ func (v *ExtensionsValidator) validateData(data json.RawMessage, schema spec.Sch
 				}
 
 				for _, item := range items {
-					err = xValidator(item)
+					err = validator(item)
 					if err != nil {
 						return err
 					}

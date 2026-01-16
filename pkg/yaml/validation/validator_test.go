@@ -69,7 +69,7 @@ sshPort: 2200
 
 		asserTestKind(t, bytesValidate, expectedTestKind)
 
-		asserValidateTestKind(t, validatorTestKind, docPassword, false, expectedTestKind)
+		asserValidateTestKind(t, validatorTestKind, docPassword, nil, expectedTestKind)
 
 		docKey := `
 apiVersion: deckhouse.io/v1
@@ -79,7 +79,7 @@ sshPort: 2200
 sshAgentPrivateKeys:
 - key: "mykey"
 `
-		asserValidateTestKind(t, validatorTestKind, docKey, false, &testKind{
+		asserValidateTestKind(t, validatorTestKind, docKey, nil, &testKind{
 			SSHUser: "ubuntu",
 			SSHPort: 2200,
 			SSHAgentPrivateKeys: []testPrivateKey{
@@ -96,7 +96,7 @@ sshUser: ubuntu
 sudoPassword: "no secret"
 `
 
-		asserValidateTestKind(t, getValidatorTestKind(t), doc, false, &testKind{
+		asserValidateTestKind(t, getValidatorTestKind(t), doc, nil, &testKind{
 			SSHUser:      "ubuntu",
 			SudoPassword: "no secret",
 			SSHPort:      22,
@@ -111,7 +111,7 @@ key: "mykey"
 			t,
 			getValidatorAnotherTestKind(t),
 			anotherTestKindDoc,
-			false,
+			nil,
 			&testAnotherKind{
 				Key: "mykey",
 				Value: testAnotherKindValue{
@@ -153,7 +153,7 @@ sshPort: 22456
 			validator := getValidatorTestKind(t)
 			validator.AddPreValidator(indexTestKind, newTestKindPreValidator(t, ""))
 
-			asserValidateTestKind(t, validator, doc, false, &testKind{
+			asserValidateTestKind(t, validator, doc, nil, &testKind{
 				SSHUser:      "ubuntu",
 				SudoPassword: "no secret",
 				SSHPort:      22456,
@@ -171,7 +171,7 @@ sshPort: 23
 			validator := getValidatorTestKind(t)
 			validator.AddPreValidator(indexTestKind, newTestKindPreValidator(t, ""))
 
-			asserValidateTestKind(t, validator, doc, true, nil)
+			asserValidateTestKind(t, validator, doc, ErrDocumentValidationFailed, nil)
 		})
 
 		t.Run("our schema valid", func(t *testing.T) {
@@ -187,7 +187,7 @@ sshPort: 22456
 
 			validator.AddPreValidator(indexTestKind, newTestKindPreValidator(t, testSchemaTestKind))
 
-			asserValidateTestKind(t, validator, doc, false, &testKind{
+			asserValidateTestKind(t, validator, doc, nil, &testKind{
 				SSHUser:      "ubuntu",
 				SudoPassword: "no secret",
 				SSHPort:      22456,
@@ -207,7 +207,7 @@ sshPort: 22456
 
 			validator.AddPreValidator(indexTestKind, newTestKindPreValidator(t, testSchemaAnotherTestKind))
 
-			asserValidateTestKind(t, validator, doc, true, nil)
+			asserValidateTestKind(t, validator, doc, ErrDocumentValidationFailed, nil)
 		})
 	})
 
@@ -283,12 +283,14 @@ sshPort: 22456
 			name         string
 			doc          string
 			errSubstring string
+			errKind      error
 			opts         []ValidateOption
 		}{
 			{
 				name:         "invalid yaml",
 				doc:          `{invalid`,
 				errSubstring: "error converting YAML to JSON: yaml: line 1",
+				errKind:      ErrKindInvalidYAML,
 			},
 			{
 				name: "no schema fields",
@@ -297,6 +299,7 @@ sshUser: ubuntu
 sudoPassword: "no secret"
 sshPort: 22456
 `,
+				errKind:      ErrKindValidationFailed,
 				errSubstring: `document must contain "kind" and "apiVersion"`,
 			},
 			{
@@ -308,6 +311,7 @@ sshUser: ubuntu
 sudoPassword: "no secret"
 sshPort: 22456
 `,
+				errKind:      ErrSchemaNotFound,
 				errSubstring: ErrSchemaNotFound.Error(),
 			},
 			{
@@ -319,6 +323,7 @@ sshUser: ubuntu
 sshPort: "port"
 sshAgentPrivateKeys: {"a": "b"}
 `,
+				errKind:      ErrDocumentValidationFailed,
 				errSubstring: "Document validation failed:\n---",
 			},
 			{
@@ -330,14 +335,22 @@ sshUser: ubuntu
 sshPort: "port"
 sshAgentPrivateKeys: {"a": "b"}
 `,
-				errSubstring: `"TestKind, deckhouse.io/v1" document validation failed:`,
+				errKind:      ErrDocumentValidationFailed,
+				errSubstring: fmt.Sprintf(`"TestKind, deckhouse.io/v1": %s:`, ErrDocumentValidationFailed.Error()),
 				opts:         []ValidateOption{ValidateWithNoPrettyError(true)},
 			},
 		}
 
 		for _, test := range tests {
 			t.Run(test.name, func(t *testing.T) {
-				asserNoValidateTestKind(t, getValidatorTestKind(t), test.doc, test.errSubstring, test.opts...)
+				asserNoValidateTestKind(
+					t,
+					getValidatorTestKind(t),
+					test.doc,
+					test.errKind,
+					test.errSubstring,
+					test.opts...,
+				)
 			})
 		}
 	})
@@ -365,7 +378,7 @@ func TestMultipleSchemasValidator(t *testing.T) {
 	tests := []struct {
 		name        string
 		doc         string
-		shouldError bool
+		shouldError error
 	}{
 		{
 			name: "test kind validate",
@@ -376,7 +389,7 @@ sshUser: ubuntu
 sudoPassword: "no secret"
 sshPort: 2200
 `,
-			shouldError: false,
+			shouldError: nil,
 		},
 
 		{
@@ -389,7 +402,7 @@ value:
   valueEnum: "OpenStack"
   valueBool: false
 `,
-			shouldError: false,
+			shouldError: nil,
 		},
 
 		{
@@ -400,7 +413,7 @@ kind: MyKind
 key: "key"
 value: 1
 `,
-			shouldError: true,
+			shouldError: ErrSchemaNotFound,
 		},
 	}
 
@@ -409,12 +422,13 @@ value: 1
 			bytes := []byte(test.doc)
 			_, err := validator.Validate(&bytes)
 
-			assertError := require.NoError
-			if test.shouldError {
-				assertError = require.Error
+			if test.shouldError == nil {
+				require.NoError(t, err, "should valid")
+				return
 			}
 
-			assertError(t, err)
+			require.Error(t, err, "should not valid")
+			require.ErrorIs(t, err, test.shouldError, "should return valid error")
 		})
 	}
 }
@@ -552,7 +566,7 @@ func newTestKindPreValidator(t *testing.T, schema string) *testKindPreValidator 
 	return r
 }
 
-func (p *testKindPreValidator) Validate(doc []byte, currentSchema *spec.Schema, _ log.Logger) (*spec.Schema, error) {
+func (p *testKindPreValidator) Validate(doc []byte, _ log.Logger) (*spec.Schema, error) {
 	v := testKind{}
 	err := yaml.Unmarshal(doc, &v)
 	if err != nil {
@@ -560,10 +574,7 @@ func (p *testKindPreValidator) Validate(doc []byte, currentSchema *spec.Schema, 
 	}
 
 	if v.SSHPort >= 22000 && v.SSHPort < 30000 {
-		if currentSchema == nil {
-			return p.mySchema, nil
-		}
-		return currentSchema, nil
+		return p.mySchema, nil
 	}
 
 	return nil, fmt.Errorf("invalid SSH port: %d", v.SSHPort)
@@ -584,7 +595,7 @@ func asserTestKind(t *testing.T, data []byte, expected *testKind) {
 	require.Equal(t, expected.SudoPassword, result.SudoPassword, "invalid sudo password")
 }
 
-func doValidate(t *testing.T, validator *Validator, expectedIndex SchemaIndex, doc string, shouldError bool, opts ...ValidateOption) []byte {
+func doValidate(t *testing.T, validator *Validator, expectedIndex SchemaIndex, doc string, shouldError error, opts ...ValidateOption) []byte {
 	index := expectedIndex
 
 	if len(opts) == 0 {
@@ -594,8 +605,9 @@ func doValidate(t *testing.T, validator *Validator, expectedIndex SchemaIndex, d
 	bytesForError := []byte(doc)
 	bytesValidateWithIndex := []byte(doc)
 	err := validator.ValidateWithIndex(&index, &bytesValidateWithIndex, opts...)
-	if shouldError {
+	if shouldError != nil {
 		require.Error(t, err, "should validation error for test another kind")
+		require.ErrorIs(t, err, shouldError, "should returns valid error")
 		require.Equal(t, bytesForError, bytesValidateWithIndex, "should not change input")
 		return nil
 	}
@@ -607,9 +619,9 @@ func doValidate(t *testing.T, validator *Validator, expectedIndex SchemaIndex, d
 	return bytesValidateWithIndex
 }
 
-func asserValidateAnotherTestKind(t *testing.T, validator *Validator, doc string, shouldError bool, expected *testAnotherKind, opts ...ValidateOption) []byte {
+func asserValidateAnotherTestKind(t *testing.T, validator *Validator, doc string, shouldError error, expected *testAnotherKind, opts ...ValidateOption) []byte {
 	bytes := doValidate(t, validator, indexAnotherTestKind, doc, shouldError, opts...)
-	if shouldError {
+	if shouldError != nil {
 		return nil
 	}
 
@@ -632,23 +644,24 @@ func asserTestKindIndex(t *testing.T, index SchemaIndex) {
 	require.Equal(t, indexTestKind, index, "invalid index value")
 }
 
-func asserValidateTestKind(t *testing.T, validator *Validator, doc string, shouldError bool, expected *testKind, opts ...ValidateOption) {
+func asserValidateTestKind(t *testing.T, validator *Validator, doc string, shouldError error, expected *testKind, opts ...ValidateOption) {
 	bytes := doValidate(t, validator, indexTestKind, doc, shouldError, opts...)
-	if shouldError {
+	if shouldError != nil {
 		return
 	}
 	asserTestKind(t, bytes, expected)
 }
 
-func asserNoValidateTestKind(t *testing.T, validator *Validator, doc string, errorSubstring string, opts ...ValidateOption) {
+func asserNoValidateTestKind(t *testing.T, validator *Validator, doc string, errorKind error, errorSubstring string, opts ...ValidateOption) {
 	bytesForError := []byte(doc)
 	bytesValidateWithIndex := []byte(doc)
 
 	_, err := validator.Validate(&bytesValidateWithIndex, opts...)
 
 	require.Error(t, err, "should not validate")
-	require.Equal(t, bytesForError, bytesValidateWithIndex, "should not change input")
+	require.ErrorIs(t, err, errorKind, "should returns valid error")
 	require.Contains(t, err.Error(), errorSubstring)
+	require.Equal(t, bytesForError, bytesValidateWithIndex, "should not change input")
 }
 
 func assertValidationWithTransformers(t *testing.T, validator *Validator, shouldError bool) {
@@ -661,7 +674,12 @@ value:
   valueEnum: "OpenStack"
   valueBool: true
 `
-	bytes := asserValidateAnotherTestKind(t, validator, doc, shouldError, &testAnotherKind{
+	var expectedErr error
+	if shouldError {
+		expectedErr = ErrDocumentValidationFailed
+	}
+
+	bytes := asserValidateAnotherTestKind(t, validator, doc, expectedErr, &testAnotherKind{
 		Key: "mykey",
 		Value: testAnotherKindValue{
 			ValueBool: true,
@@ -712,7 +730,12 @@ sshAgentPrivateKeys:
   passphrase: %s
 `, keyPassword)
 
-	asserValidateTestKind(t, validator, doc, shouldError, &testKind{
+	var expectedErr error
+	if shouldError {
+		expectedErr = ErrDocumentValidationFailed
+	}
+
+	asserValidateTestKind(t, validator, doc, expectedErr, &testKind{
 		SSHUser: "ubuntu",
 		SSHPort: 2200,
 		SSHAgentPrivateKeys: []testPrivateKey{

@@ -31,10 +31,6 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-var (
-	ErrSchemaNotFound = fmt.Errorf("schema not found")
-)
-
 type validateOptions struct {
 	omitDocInError  bool
 	strictUnmarshal bool
@@ -63,9 +59,9 @@ func ValidateWithNoPrettyError(v bool) ValidateOption {
 
 type PreValidator interface {
 	// Validate
-	// currentSchema can be nil
-	// if validator does not provide our own schema please return currentSchema
-	Validate(doc []byte, currentSchema *spec.Schema, logger log.Logger) (*spec.Schema, error)
+	// if validator does not provide our own schema please return nil
+	// will use schema getting for index
+	Validate(doc []byte, logger log.Logger) (*spec.Schema, error)
 }
 
 type Validator struct {
@@ -160,7 +156,7 @@ func (v *Validator) Validate(doc *[]byte, opts ...ValidateOption) (*SchemaIndex,
 
 	err := yaml.Unmarshal(*doc, &index)
 	if err != nil {
-		return nil, fmt.Errorf("Schema index unmarshal failed: %w", err)
+		return nil, fmt.Errorf("%w %w: schema index unmarshal failed: %w", ErrKindValidationFailed, ErrKindInvalidYAML, err)
 	}
 
 	err = v.ValidateWithIndex(&index, doc, opts...)
@@ -173,8 +169,8 @@ func (v *Validator) Validate(doc *[]byte, opts ...ValidateOption) (*SchemaIndex,
 func (v *Validator) ValidateWithIndex(index *SchemaIndex, doc *[]byte, opts ...ValidateOption) error {
 	if !index.IsValid() {
 		return fmt.Errorf(
-			"document must contain \"kind\" and \"apiVersion\" fields:\n\tapiVersion: %s\n\tkind: %s\n\n%s",
-			index.Version, index.Kind, string(*doc),
+			"%w: document must contain \"kind\" and \"apiVersion\" fields:\n\tapiVersion: %s\n\tkind: %s\n\n%s",
+			ErrKindValidationFailed, index.Version, index.Kind, string(*doc),
 		)
 	}
 
@@ -183,23 +179,18 @@ func (v *Validator) ValidateWithIndex(index *SchemaIndex, doc *[]byte, opts ...V
 		opt(options)
 	}
 
-	logger := log.SafeProvideLogger(v.loggerProvider)
-
 	docForValidate := *doc
 
-	schema := v.getSchemaWithFallback(index, logger)
+	schema := v.getSchemaWithFallback(index)
 
-	preValidator, ok := v.preValidators[*index]
-	if ok && !govalue.IsNil(preValidator) {
-		var err error
-		schema, err = preValidator.Validate(docForValidate, schema, logger)
-		if err != nil {
-			return err
-		}
+	var err error
+	schema, err = v.runPreValidation(index, schema, docForValidate)
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrDocumentValidationFailed, err)
 	}
 
 	if schema == nil {
-		logger.DebugF("No schema for index %s. Skip it", index.String())
+		v.logger().DebugF("No schema for index %s. Skip it", index.String())
 		// we need return error because on top level we want filter documents without index and move into resources
 		return ErrSchemaNotFound
 	}
@@ -209,7 +200,7 @@ func (v *Validator) ValidateWithIndex(index *SchemaIndex, doc *[]byte, opts ...V
 	isValid, err := v.openAPIValidate(&docForValidate, schema, options)
 	if !isValid {
 		if options.omitDocInError || options.noPrettyError {
-			return fmt.Errorf("%q document validation failed: %w", index.String(), err)
+			return fmt.Errorf("%q: %w", index.String(), err)
 		}
 		return fmt.Errorf("Document validation failed:\n---\n%s\n\n%w", string(*doc), err)
 	}
@@ -217,6 +208,22 @@ func (v *Validator) ValidateWithIndex(index *SchemaIndex, doc *[]byte, opts ...V
 	*doc = docForValidate
 
 	return nil
+}
+
+func (v *Validator) runPreValidation(index *SchemaIndex, schema *spec.Schema, doc []byte) (*spec.Schema, error) {
+	preValidator, ok := v.preValidators[*index]
+	if ok && !govalue.IsNil(preValidator) {
+		schemaFromValidator, err := preValidator.Validate(doc, v.logger())
+		if err != nil {
+			return nil, err
+		}
+
+		if !govalue.IsNil(schemaFromValidator) {
+			return schemaFromValidator, nil
+		}
+	}
+
+	return schema, nil
 }
 
 func (v *Validator) addTransformersForSchema(index *SchemaIndex, schema *spec.Schema) *spec.Schema {
@@ -240,7 +247,7 @@ func (v *Validator) addTransformersForSchema(index *SchemaIndex, schema *spec.Sc
 	return schema
 }
 
-func (v *Validator) getSchemaWithFallback(index *SchemaIndex, logger log.Logger) *spec.Schema {
+func (v *Validator) getSchemaWithFallback(index *SchemaIndex) *spec.Schema {
 	schema := v.Get(index)
 	if schema != nil {
 		return schema
@@ -248,7 +255,7 @@ func (v *Validator) getSchemaWithFallback(index *SchemaIndex, logger log.Logger)
 
 	fallback, ok := v.versionFallbacks[index.Version]
 	if !ok || fallback == "" {
-		logger.DebugF("No fallback schema for version %s", index.Version)
+		v.logger().DebugF("No fallback schema for version %s", index.Version)
 		return nil
 	}
 
@@ -264,29 +271,31 @@ func (v *Validator) openAPIValidate(dataObj *[]byte, schema *spec.Schema, option
 
 	dataBytes := *dataObj
 
+	unmarshal := yaml.Unmarshal
+	msg := "json unmarshal"
 	if options.strictUnmarshal {
-		err := yaml.UnmarshalStrict(dataBytes, &blank)
-		if err != nil {
-			return false, fmt.Errorf("openAPIValidate json unmarshal strict: %v", err)
-		}
-	} else {
-		err := yaml.Unmarshal(dataBytes, &blank)
-		if err != nil {
-			return false, fmt.Errorf("openAPIValidate json unmarshal: %v", err)
-		}
+		unmarshal = yaml.UnmarshalStrict
+		msg = "json unmarshal strict"
+	}
+
+	if err := unmarshal(dataBytes, &blank); err != nil {
+		return false, fmt.Errorf("%w: %s: %w", ErrKindInvalidYAML, msg, err)
 	}
 
 	result := validator.Validate(blank)
 	if !result.IsValid() {
 		var allErrs *multierror.Error
 		allErrs = multierror.Append(allErrs, result.Errors...)
-
-		return false, allErrs.ErrorOrNil()
+		var resErr error = ErrDocumentValidationFailed
+		if err := allErrs.ErrorOrNil(); err != nil {
+			resErr = fmt.Errorf("%w: %w", resErr, err)
+		}
+		return false, resErr
 	}
 
 	for _, extensionsValidator := range v.extensionsValidators {
 		if err := extensionsValidator.Validate(dataBytes, *schema); err != nil {
-			return false, err
+			return false, fmt.Errorf("%w: %w", ErrDocumentValidationFailed, err)
 		}
 	}
 
@@ -295,4 +304,8 @@ func (v *Validator) openAPIValidate(dataObj *[]byte, schema *spec.Schema, option
 	*dataObj, _ = json.Marshal(result.Data())
 
 	return true, nil
+}
+
+func (v *Validator) logger() log.Logger {
+	return log.SafeProvideLogger(v.loggerProvider)
 }

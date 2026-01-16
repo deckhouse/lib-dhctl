@@ -25,16 +25,26 @@ const (
 	ErrKindChangesValidationFailed ErrorKind = iota + 1
 	ErrKindValidationFailed
 	ErrKindInvalidYAML
+	ErrDocumentValidationFailed
+	ErrSchemaNotFound
 )
+
+func (k ErrorKind) Error() string {
+	return k.String()
+}
 
 func (k ErrorKind) String() string {
 	switch k {
 	case ErrKindChangesValidationFailed:
 		return "ChangesValidationFailed"
 	case ErrKindValidationFailed:
-		return "ValidationFailed"
+		return "DocumentKindValidationFailed"
 	case ErrKindInvalidYAML:
 		return "InvalidYAML"
+	case ErrDocumentValidationFailed:
+		return "DocumentValidationFailed"
+	case ErrSchemaNotFound:
+		return "SchemaNotFound"
 	default:
 		return "unknown"
 	}
