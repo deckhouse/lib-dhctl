@@ -28,11 +28,14 @@ const (
 	ErrDocumentValidationFailed
 	ErrSchemaNotFound
 	ErrRead
+	ErrUnknown
 )
 
 func (k ErrorKind) Error() string {
 	return k.String()
 }
+
+const unknownErrString = "Unknown"
 
 func (k ErrorKind) String() string {
 	switch k {
@@ -48,8 +51,10 @@ func (k ErrorKind) String() string {
 		return "SchemaNotFound"
 	case ErrRead:
 		return "ReadError"
+	case ErrUnknown:
+		return unknownErrString
 	default:
-		return "unknown"
+		return unknownErrString
 	}
 }
 
