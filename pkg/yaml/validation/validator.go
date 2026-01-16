@@ -264,7 +264,7 @@ func (v *Validator) getSchemaWithFallback(index *SchemaIndex) *spec.Schema {
 	return v.Get(index)
 }
 
-func (v *Validator) openAPIValidate(dataObj *[]byte, schema *spec.Schema, options *validateOptions) (isValid bool, multiErr error) {
+func (v *Validator) openAPIValidate(dataObj *[]byte, schema *spec.Schema, options *validateOptions) (bool, error) {
 	validator := validate.NewSchemaValidator(schema, nil, "", strfmt.Default)
 
 	var blank map[string]interface{}
