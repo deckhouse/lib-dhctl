@@ -16,11 +16,63 @@ package validation
 
 import (
 	"fmt"
+	"io"
+	"strings"
+
+	"sigs.k8s.io/yaml"
+)
+
+const (
+	InvalidGroupPrefix = "invalid:"
 )
 
 type SchemaIndex struct {
 	Kind    string `json:"kind"`
 	Version string `json:"apiVersion"`
+}
+
+type parseIndexOption struct {
+	noCheckIsValid bool
+}
+
+type ParseIndexOption func(*parseIndexOption)
+
+func ParseIndexWithoutCheckValid() ParseIndexOption {
+	return func(o *parseIndexOption) {
+		o.noCheckIsValid = true
+	}
+}
+
+var parseIndexNoCheckValidOpt = ParseIndexWithoutCheckValid()
+
+// ParseIndex
+// parse SchemaIndex from reader
+// if reader returns error - wrap reader error with ErrRead
+// also function validate is SchemaIndex is valid. Is invalid returns ErrKindValidationFailed
+// with pretty error with input doc in error
+// if content was not unmarshal wrap unmarshal error with ErrKindValidationFailed ErrKindInvalidYAML
+func ParseIndex(reader io.Reader, opts ...ParseIndexOption) (*SchemaIndex, error) {
+	options := &parseIndexOption{}
+	for _, o := range opts {
+		o(options)
+	}
+
+	content, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrRead, err)
+	}
+
+	index := SchemaIndex{}
+	err = yaml.Unmarshal(content, &index)
+	if err != nil {
+		return nil, fmt.Errorf("%w %w: schema index unmarshal failed: %w", ErrKindValidationFailed, ErrKindInvalidYAML, err)
+	}
+
+	if !options.noCheckIsValid && !index.IsValid() {
+		return nil, index.invalidIndexErr(content)
+	}
+
+	return &index, nil
 }
 
 func (i *SchemaIndex) IsValid() bool {
@@ -29,4 +81,59 @@ func (i *SchemaIndex) IsValid() bool {
 
 func (i *SchemaIndex) String() string {
 	return fmt.Sprintf("%s, %s", i.Kind, i.Version)
+}
+
+// Group
+// returns group (deckhouse.io if passed like deckhouse.io/v1)
+// if Version is invalid (for example deckhouse.io/dhctl/v1)
+// returns invalid: deckhouse.io/dhctl/v1 string
+// check is invalid as strings.HasPrefix(s, InvalidGroupPrefix)
+// if Version does not contain group (if Version is v1 for example)
+// returns empty string
+func (i *SchemaIndex) Group() string {
+	g, _ := i.GroupAndGroupVersion()
+	return g
+}
+
+// GroupVersion
+// returns group version (v1 if passed like deckhouse.io/v1)
+// if Version is invalid (for example deckhouse.io/dhctl/v1)
+// returns invalid: deckhouse.io/dhctl/v1 string
+// check is invalid as strings.HasPrefix(s, InvalidGroupPrefix)
+func (i *SchemaIndex) GroupVersion() string {
+	_, gv := i.GroupAndGroupVersion()
+	return gv
+}
+
+// GroupAndGroupVersion
+// returns group (like deckhouse.io) as first value
+// and group version (like v1) as second value
+// if Version is invalid (for example deckhouse.io/dhctl/v1)
+// returns invalid: deckhouse.io/dhctl/v1 string as all arguments
+// check is invalid as strings.HasPrefix(s, InvalidGroupPrefix)
+// if Version contains only group version (if Version is v1 for example)
+// returns empty string as first value and version as second
+func (i *SchemaIndex) GroupAndGroupVersion() (string, string) {
+	v := i.Version
+	if v == "" {
+		return "", ""
+	}
+
+	switch strings.Count(i.Version, "/") {
+	case 0:
+		return "", v
+	case 1:
+		i := strings.Index(v, "/")
+		return v[:i], v[i+1:]
+	default:
+		invalid := fmt.Sprintf("%s %s", InvalidGroupPrefix, i.Version)
+		return invalid, invalid
+	}
+}
+
+func (i *SchemaIndex) invalidIndexErr(doc []byte) error {
+	return fmt.Errorf(
+		"%w: document must contain \"kind\" and \"apiVersion\" fields:\n\tapiVersion: %s\n\tkind: %s\n\n%s",
+		ErrKindValidationFailed, i.Version, i.Kind, string(doc),
+	)
 }

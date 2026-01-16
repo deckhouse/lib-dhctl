@@ -43,7 +43,7 @@ type SchemaWithIndex struct {
 func LoadSchemas(reader io.Reader) ([]*SchemaWithIndex, error) {
 	fileContent, err := io.ReadAll(reader)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %w", ErrRead, err)
 	}
 
 	openAPISchema := new(OpenAPISchema)

@@ -27,6 +27,7 @@ const (
 	ErrKindInvalidYAML
 	ErrDocumentValidationFailed
 	ErrSchemaNotFound
+	ErrRead
 )
 
 func (k ErrorKind) Error() string {
@@ -45,6 +46,8 @@ func (k ErrorKind) String() string {
 		return "DocumentValidationFailed"
 	case ErrSchemaNotFound:
 		return "SchemaNotFound"
+	case ErrRead:
+		return "ReadError"
 	default:
 		return "unknown"
 	}
