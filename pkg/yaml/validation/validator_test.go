@@ -339,6 +339,21 @@ sshAgentPrivateKeys: {"a": "b"}
 				errSubstring: fmt.Sprintf(`"TestKind, deckhouse.io/v1": %s:`, ErrDocumentValidationFailed.Error()),
 				opts:         []ValidateOption{ValidateWithNoPrettyError(true)},
 			},
+			{
+				name: "multiple api versions and kinds",
+				doc: `
+apiVersion: deckhouse.io/v1
+kind: TestKind
+sshUser: ubuntu
+sshPort: "port"
+sshAgentPrivateKeys: {"a": "b"}
+apiVersion: deckhouse.io/v1
+kind: AnotherKind
+key: key
+`,
+				errSubstring: "DocumentKindValidationFailed: multiple apiVersion keys found: apiVersion: deckhouse.io/v1 apiVersion: deckhouse.io/v1",
+				errKind:      ErrKindValidationFailed,
+			},
 		}
 
 		for _, test := range tests {

@@ -143,12 +143,85 @@ value: 1
 		},
 
 		{
+			name: "multiple api versions",
+			reader: strings.NewReader(`
+apiVersion: deckhouse.io/v1
+kind: TestKind
+key: key
+value: 1
+apiVersion: deckhouse.io/v1
+kkey: vval
+`),
+			errs: []error{ErrKindValidationFailed},
+			opts: []ParseIndexOption{ParseIndexWithoutCheckValid()},
+		},
+
+		{
+			name: "multiple kinds",
+			reader: strings.NewReader(`
+apiVersion: deckhouse.io/v1
+kind: TestKind
+key: key
+value: 1
+kind: AnotherKind
+kkey: vval
+`),
+			errs: []error{ErrKindValidationFailed},
+			opts: []ParseIndexOption{ParseIndexWithoutCheckValid()},
+		},
+
+		{
+			name: "multiple api versions and kinds",
+			reader: strings.NewReader(`
+# apiVersion here
+apiVersion: deckhouse.io/v1 
+kind: TestKind
+key: key
+value: 1
+apiVersion: deckhouse.io/v1
+kind: AnotherKind
+kkey: vval
+`),
+			errs: []error{ErrKindValidationFailed},
+			opts: []ParseIndexOption{ParseIndexWithoutCheckValid()},
+		},
+
+		{
+			name: "multiple api versions and kinds",
+			reader: strings.NewReader(`
+# apiVersion here
+apiVersion: deckhouse.io/v1 
+kind: TestKind
+key: key
+value: 1
+apiVersion: deckhouse.io/v1
+kind: AnotherKind
+kkey: vval
+`),
+			errs: []error{ErrKindValidationFailed},
+			opts: []ParseIndexOption{ParseIndexWithoutCheckValid()},
+		},
+
+		{
 			name: "happy case",
 			reader: strings.NewReader(`
 apiVersion: deckhouse.io/v1
 kind: TestKind
 sshUser: ubuntu
 sshPort: 2200
+`),
+			errs: nil,
+		},
+
+		{
+			name: "not fail if apiVersion and kind string presents but not keys",
+			reader: strings.NewReader(`
+# apiVersion here
+apiVersion: deckhouse.io/v1 # apiVersion: here
+# kind here
+kind: TestKind # kind: here
+key: apiVersion
+value: kind
 `),
 			errs: nil,
 		},

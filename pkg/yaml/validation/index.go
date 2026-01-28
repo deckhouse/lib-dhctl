@@ -15,8 +15,10 @@
 package validation
 
 import (
+	"bytes"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 
 	"sigs.k8s.io/yaml"
@@ -62,7 +64,12 @@ func ParseIndex(reader io.Reader, opts ...ParseIndexOption) (*SchemaIndex, error
 		return nil, fmt.Errorf("%w: %w", ErrRead, err)
 	}
 
+	if err := contentHasMultipleSchemaKeys(content); err != nil {
+		return nil, err
+	}
+
 	index := SchemaIndex{}
+
 	err = yaml.Unmarshal(content, &index)
 	if err != nil {
 		return nil, fmt.Errorf("%w %w: schema index unmarshal failed: %w", ErrKindValidationFailed, ErrKindInvalidYAML, err)
@@ -136,4 +143,27 @@ func (i *SchemaIndex) invalidIndexErr(doc []byte) error {
 		"%w: document must contain \"kind\" and \"apiVersion\" fields:\n\tapiVersion: %s\n\tkind: %s\n\n%s",
 		ErrKindValidationFailed, i.Version, i.Kind, string(doc),
 	)
+}
+
+var (
+	apiVersionRegex = regexp.MustCompile(`(?m)^apiVersion:.*$`)
+	kindRegex       = regexp.MustCompile(`(?m)^kind:.*$`)
+	errSeparator    = []byte(" ")
+)
+
+func multipleKeysErr(keyName string, keys [][]byte) error {
+	joinedKeys := bytes.Join(keys, errSeparator)
+	return fmt.Errorf("%w: multiple %s keys found: %s", ErrKindValidationFailed, keyName, string(joinedKeys))
+}
+
+func contentHasMultipleSchemaKeys(content []byte) error {
+	if res := apiVersionRegex.FindAll(content, 2); len(res) > 1 {
+		return multipleKeysErr("apiVersion", res)
+	}
+
+	if res := kindRegex.FindAll(content, 2); len(res) > 1 {
+		return multipleKeysErr("kind", res)
+	}
+
+	return nil
 }
