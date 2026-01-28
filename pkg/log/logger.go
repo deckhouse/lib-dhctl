@@ -108,27 +108,27 @@ type baseLogger interface {
 	Process(Process, string, func() error) error
 
 	InfoFWithoutLn(format string, a ...interface{})
+
 	// InfoLn
-	// Deprecated:
-	// Use InfoF(string) it add \n to end
+	// Deprecated: Use InfoF(string) it add \n to end
 	InfoLn(a ...interface{})
 
 	ErrorFWithoutLn(format string, a ...interface{})
+
 	// ErrorLn
-	// Deprecated:
-	// Use ErrorF(string) it add \n to end
+	// Deprecated: Use ErrorF(string) it add \n to end
 	ErrorLn(a ...interface{})
 
 	DebugFWithoutLn(format string, a ...interface{})
+
 	// DebugLn
-	// Deprecated:
-	// Use DebugF(string) it add \n to end
+	// Deprecated: Use DebugF(string) it add \n to end
 	DebugLn(a ...interface{})
 
 	WarnFWithoutLn(format string, a ...interface{})
+
 	// WarnLn
-	// Deprecated:
-	// Use WarnF(string) it add \n to end
+	// Deprecated: Use WarnF(string) it add \n to end
 	WarnLn(a ...interface{})
 
 	Success(string)

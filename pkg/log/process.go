@@ -105,7 +105,7 @@ func (l *wrappedProcessLogger) ProcessStart(msg string) {
 
 	l.processes.push(p)
 
-	l.logger.InfoLn(msg)
+	l.logger.InfoF(msg)
 }
 
 func (l *wrappedProcessLogger) ProcessEnd() {
@@ -116,7 +116,7 @@ func (l *wrappedProcessLogger) ProcessEnd() {
 		msg = fmt.Sprintf("%s (%s)", p.Msg, p.formatTime())
 	}
 
-	l.logger.InfoLn(msg)
+	l.logger.InfoF(msg)
 }
 
 func (l *wrappedProcessLogger) ProcessFail() {
@@ -127,5 +127,5 @@ func (l *wrappedProcessLogger) ProcessFail() {
 		msg = fmt.Sprintf("%s FAILED (%s)", p.Msg, p.formatTime())
 	}
 
-	l.logger.ErrorLn(msg)
+	l.logger.ErrorF(msg)
 }

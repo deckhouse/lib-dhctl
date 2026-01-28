@@ -172,6 +172,8 @@ func (l *InMemoryLogger) InfoFWithoutLn(format string, a ...interface{}) {
 	l.parent.InfoFWithoutLn(format, a...)
 }
 
+// InfoLn
+// Deprecated: Use InfoF(string) it add \n to end
 func (l *InMemoryLogger) InfoLn(a ...interface{}) {
 	l.writeEntityFormatted(listToString(a))
 	l.parent.InfoLn(a...)
@@ -182,6 +184,8 @@ func (l *InMemoryLogger) ErrorFWithoutLn(format string, a ...interface{}) {
 	l.parent.ErrorFWithoutLn(format, a...)
 }
 
+// ErrorLn
+// Deprecated: Use ErrorF(string) it add \n to end
 func (l *InMemoryLogger) ErrorLn(a ...interface{}) {
 	l.writeEntityWithPrefix(l.errorPrefix, listToString(a))
 	l.parent.ErrorLn(a...)
@@ -196,6 +200,8 @@ func (l *InMemoryLogger) DebugFWithoutLn(format string, a ...interface{}) {
 	l.parent.DebugFWithoutLn(format, a...)
 }
 
+// DebugLn
+// Deprecated: Use DebugF(string) it add \n to end
 func (l *InMemoryLogger) DebugLn(a ...interface{}) {
 	if l.notDebug {
 		return
@@ -210,6 +216,8 @@ func (l *InMemoryLogger) WarnFWithoutLn(format string, a ...interface{}) {
 	l.parent.WarnFWithoutLn(format, a...)
 }
 
+// WarnLn
+// Deprecated: Use WarnF(string) it add \n to end
 func (l *InMemoryLogger) WarnLn(a ...interface{}) {
 	l.writeEntityFormatted(listToString(a))
 	l.parent.WarnLn(a...)
