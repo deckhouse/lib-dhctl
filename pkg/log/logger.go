@@ -110,26 +110,29 @@ type baseLogger interface {
 	InfoFWithoutLn(format string, a ...interface{})
 
 	// InfoLn
-	// Deprecated: Use InfoF(string) it add \n to end
+	// Deprecated:
+	// Use InfoF(string) it add \n to end
 	InfoLn(a ...interface{})
 
 	ErrorFWithoutLn(format string, a ...interface{})
 
 	// ErrorLn
-	// Deprecated: Use ErrorF(string) it add \n to end
+	// Deprecated:
+	// Use ErrorF(string) it add \n to end
 	ErrorLn(a ...interface{})
 
 	DebugFWithoutLn(format string, a ...interface{})
 
 	// DebugLn
-	// Deprecated: Use DebugF(string) it add \n to end
+	// Deprecated:
+	// Use DebugF(string) it add \n to end
 	DebugLn(a ...interface{})
 
 	WarnFWithoutLn(format string, a ...interface{})
 
 	// WarnLn
-	//
-	// Deprecated: Use WarnF(string) it add \n to end
+	// Deprecated:
+	// Use WarnF(string) it add \n to end
 	WarnLn(a ...interface{})
 
 	Success(string)
@@ -150,18 +153,22 @@ type formatWithNewLineLogger interface {
 	// InfoF
 	// Warning! InfoF add \n to end of message.
 	// If you do not have \n to end of message please use InfoFWithoutLn
+	// Also trim last new line from format
 	InfoF(format string, a ...any)
 	// ErrorF
 	// Warning! ErrorF add \n to end of message.
 	// If you do not have \n to end of message please use ErrorFWithoutLn
+	// Also trim last new line from format
 	ErrorF(format string, a ...any)
 	// DebugF
 	// Warning! DebugF add \n to end of message.
 	// If you do not have \n to end of message please use DebugFWithoutLn
+	// Also trim last new line from format
 	DebugF(format string, a ...any)
 	// WarnF
 	// Warning! WarnF add \n to end of message.
 	// If you do not have \n to end of message please use WarnFWithoutLn
+	// Also trim last new line from format
 	WarnF(format string, a ...any)
 }
 

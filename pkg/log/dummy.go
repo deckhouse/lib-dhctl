@@ -71,7 +71,8 @@ func (d *DummyLogger) InfoFWithoutLn(format string, a ...interface{}) {
 }
 
 // InfoLn
-// Deprecated: Use InfoF(string) it add \n to end
+// Deprecated:
+// Use InfoF(string) it add \n to end
 func (d *DummyLogger) InfoLn(a ...interface{}) {
 	fmt.Println(a...)
 }
@@ -81,7 +82,8 @@ func (d *DummyLogger) ErrorFWithoutLn(format string, a ...interface{}) {
 }
 
 // ErrorLn
-// Deprecated: Use ErrorF(string) it add \n to end
+// Deprecated:
+// Use ErrorF(string) it add \n to end
 func (d *DummyLogger) ErrorLn(a ...interface{}) {
 	fmt.Println(a...)
 }
@@ -93,7 +95,8 @@ func (d *DummyLogger) DebugFWithoutLn(format string, a ...interface{}) {
 }
 
 // DebugLn
-// Deprecated: Use DebugF(string) it add \n to end
+// Deprecated:
+// Use DebugF(string) it add \n to end
 func (d *DummyLogger) DebugLn(a ...interface{}) {
 	if d.isDebug {
 		fmt.Println(a...)
@@ -113,7 +116,8 @@ func (d *DummyLogger) FailRetry(l string) {
 }
 
 // WarnLn
-// Deprecated: Use WarnF(string) it add \n to end
+// Deprecated:
+// Use WarnF(string) it add \n to end
 func (d *DummyLogger) WarnLn(a ...interface{}) {
 	fmt.Println(a...)
 }

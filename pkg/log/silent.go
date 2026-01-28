@@ -75,7 +75,8 @@ func (d *SilentLogger) InfoFWithoutLn(format string, a ...interface{}) {
 }
 
 // InfoLn
-// Deprecated: Use InfoF(string) it add \n to end
+// Deprecated:
+// Use InfoF(string) it add \n to end
 func (d *SilentLogger) InfoLn(a ...interface{}) {
 	if d.t != nil {
 		d.t.writeToFile(fmt.Sprintln(a...))
@@ -89,7 +90,8 @@ func (d *SilentLogger) ErrorFWithoutLn(format string, a ...interface{}) {
 }
 
 // ErrorLn
-// Deprecated: Use ErrorF(string) it add \n to end
+// Deprecated:
+// Use ErrorF(string) it add \n to end
 func (d *SilentLogger) ErrorLn(a ...interface{}) {
 	if d.t != nil {
 		d.t.writeToFile(fmt.Sprintln(a...))
@@ -103,7 +105,8 @@ func (d *SilentLogger) DebugFWithoutLn(format string, a ...interface{}) {
 }
 
 // DebugLn
-// Deprecated: Use DebugF(string) it add \n to end
+// Deprecated:
+// Use DebugF(string) it add \n to end
 func (d *SilentLogger) DebugLn(a ...interface{}) {
 	if d.t != nil {
 		d.t.writeToFile(fmt.Sprintln(a...))
@@ -129,7 +132,8 @@ func (d *SilentLogger) FailRetry(l string) {
 }
 
 // WarnLn
-// Deprecated: Use WarnF(string) it add \n to end
+// Deprecated:
+// Use WarnF(string) it add \n to end
 func (d *SilentLogger) WarnLn(a ...interface{}) {
 	if d.t != nil {
 		d.t.writeToFile(fmt.Sprintln(a...))

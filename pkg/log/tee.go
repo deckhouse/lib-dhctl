@@ -126,7 +126,8 @@ func (d *TeeLogger) InfoFWithoutLn(format string, a ...interface{}) {
 }
 
 // InfoLn
-// Deprecated: Use InfoF(string) it add \n to end
+// Deprecated:
+// Use InfoF(string) it add \n to end
 func (d *TeeLogger) InfoLn(a ...interface{}) {
 	d.l.InfoLn(a...)
 
@@ -140,7 +141,8 @@ func (d *TeeLogger) ErrorFWithoutLn(format string, a ...interface{}) {
 }
 
 // ErrorLn
-// Deprecated: Use ErrorF(string) it add \n to end
+// Deprecated:
+// Use ErrorF(string) it add \n to end
 func (d *TeeLogger) ErrorLn(a ...interface{}) {
 	d.l.ErrorLn(a...)
 
@@ -154,7 +156,8 @@ func (d *TeeLogger) DebugFWithoutLn(format string, a ...interface{}) {
 }
 
 // DebugLn
-// Deprecated: Use DebugF(string) it add \n to end
+// Deprecated:
+// Use DebugF(string) it add \n to end
 func (d *TeeLogger) DebugLn(a ...interface{}) {
 	d.l.DebugLn(a...)
 
@@ -180,7 +183,8 @@ func (d *TeeLogger) FailRetry(l string) {
 }
 
 // WarnLn
-// Deprecated: Use WarnF(string) it add \n to end
+// Deprecated:
+// Use WarnF(string) it add \n to end
 func (d *TeeLogger) WarnLn(a ...interface{}) {
 	d.l.WarnLn(a...)
 

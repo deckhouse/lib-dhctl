@@ -86,7 +86,8 @@ func (d *SimpleLogger) InfoFWithoutLn(format string, a ...interface{}) {
 }
 
 // InfoLn
-// Deprecated: Use InfoF(string) it add \n to end
+// Deprecated:
+// Use InfoF(string) it add \n to end
 func (d *SimpleLogger) InfoLn(a ...interface{}) {
 	d.logger.Info(listToString(a))
 }
@@ -96,7 +97,8 @@ func (d *SimpleLogger) ErrorFWithoutLn(format string, a ...interface{}) {
 }
 
 // ErrorLn
-// Deprecated: Use ErrorF(string) it add \n to end
+// Deprecated:
+// Use ErrorF(string) it add \n to end
 func (d *SimpleLogger) ErrorLn(a ...interface{}) {
 	d.logger.Error(listToString(a))
 }
@@ -108,7 +110,8 @@ func (d *SimpleLogger) DebugFWithoutLn(format string, a ...interface{}) {
 }
 
 // DebugLn
-// Deprecated: Use DebugF(string) it add \n to end
+// Deprecated:
+// Use DebugF(string) it add \n to end
 func (d *SimpleLogger) DebugLn(a ...interface{}) {
 	if d.isDebug {
 		d.logger.Debug(listToString(a))
@@ -133,7 +136,8 @@ func (d *SimpleLogger) WarnFWithoutLn(format string, a ...interface{}) {
 }
 
 // WarnLn
-// Deprecated: Use WarnF(string) it add \n to end
+// Deprecated:
+// Use WarnF(string) it add \n to end
 func (d *SimpleLogger) WarnLn(a ...interface{}) {
 	d.logger.Warn(listToString(a))
 }

@@ -122,7 +122,8 @@ func (d *PrettyLogger) InfoFWithoutLn(format string, a ...interface{}) {
 }
 
 // InfoLn
-// Deprecated: Use InfoF(string) it add \n to end
+// Deprecated:
+// Use InfoF(string) it add \n to end
 func (d *PrettyLogger) InfoLn(a ...interface{}) {
 	d.logboekLogger.Info().LogLn(a...)
 }
@@ -132,7 +133,8 @@ func (d *PrettyLogger) ErrorFWithoutLn(format string, a ...interface{}) {
 }
 
 // ErrorLn
-// Deprecated: Use ErrorF(string) it add \n to end
+// Deprecated:
+// Use ErrorF(string) it add \n to end
 func (d *PrettyLogger) ErrorLn(a ...interface{}) {
 	d.logboekLogger.Error().LogLn(a...)
 }
@@ -152,7 +154,8 @@ func (d *PrettyLogger) DebugFWithoutLn(format string, a ...interface{}) {
 }
 
 // DebugLn
-// Deprecated: Use DebugF(string) it add \n to end
+// Deprecated:
+// Use DebugF(string) it add \n to end
 func (d *PrettyLogger) DebugLn(a ...interface{}) {
 	if d.debugLogWriter != nil {
 		o := fmt.Sprintln(a...)
@@ -180,7 +183,8 @@ func (d *PrettyLogger) FailRetry(l string) {
 }
 
 // WarnLn
-// Deprecated: Use WarnF(string) it add \n to end
+// Deprecated:
+// Use WarnF(string) it add \n to end
 func (d *PrettyLogger) WarnLn(a ...interface{}) {
 	a = append([]interface{}{"❗ ~ "}, a...)
 	d.InfoLn(color.New(color.Bold).Sprint(a...))
