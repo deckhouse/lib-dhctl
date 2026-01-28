@@ -99,4 +99,37 @@ func TestProcessLoggers(t *testing.T) {
 			})
 		})
 	}
+
+	t.Run("Add new line to process messages", func(t *testing.T) {
+		assertNewLine := func(t *testing.T, logger *InMemoryLogger, count int) {
+			startMatches, err := logger.AllMatches(&Match{
+				Suffix: []string{"\n"},
+			})
+
+			require.NoError(t, err)
+			require.Len(t, startMatches, count)
+
+			for i := 0; i < count; i++ {
+				require.NotEmpty(t, startMatches[i], "should contains new line")
+			}
+		}
+
+		expectedLoggerSuccess := NewInMemoryLoggerWithParent(NewPrettyLogger(LoggerOptions{}))
+		successLogger := newWrappedProcessLogger(expectedLoggerSuccess)
+
+		successLogger.ProcessStart("Process start")
+		assertNewLine(t, expectedLoggerSuccess, 1)
+
+		successLogger.ProcessEnd()
+		assertNewLine(t, expectedLoggerSuccess, 2)
+
+		expectedLoggerFail := NewInMemoryLoggerWithParent(NewPrettyLogger(LoggerOptions{}))
+		failLogger := newWrappedProcessLogger(expectedLoggerFail)
+
+		failLogger.ProcessStart("Process fail")
+		assertNewLine(t, expectedLoggerFail, 1)
+
+		failLogger.ProcessFail()
+		assertNewLine(t, expectedLoggerFail, 2)
+	})
 }

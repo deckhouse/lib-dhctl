@@ -121,6 +121,9 @@ func (d *PrettyLogger) InfoFWithoutLn(format string, a ...interface{}) {
 	d.logboekLogger.Info().LogF(format, a...)
 }
 
+// InfoLn
+// Deprecated:
+// Use InfoF(string) it add \n to end
 func (d *PrettyLogger) InfoLn(a ...interface{}) {
 	d.logboekLogger.Info().LogLn(a...)
 }
@@ -129,6 +132,9 @@ func (d *PrettyLogger) ErrorFWithoutLn(format string, a ...interface{}) {
 	d.logboekLogger.Error().LogF(format, a...)
 }
 
+// ErrorLn
+// Deprecated:
+// Use ErrorF(string) it add \n to end
 func (d *PrettyLogger) ErrorLn(a ...interface{}) {
 	d.logboekLogger.Error().LogLn(a...)
 }
@@ -147,6 +153,9 @@ func (d *PrettyLogger) DebugFWithoutLn(format string, a ...interface{}) {
 	}
 }
 
+// DebugLn
+// Deprecated:
+// Use DebugF(string) it add \n to end
 func (d *PrettyLogger) DebugLn(a ...interface{}) {
 	if d.debugLogWriter != nil {
 		o := fmt.Sprintln(a...)
@@ -173,6 +182,9 @@ func (d *PrettyLogger) FailRetry(l string) {
 	d.Fail(l)
 }
 
+// WarnLn
+// Deprecated:
+// Use WarnF(string) it add \n to end
 func (d *PrettyLogger) WarnLn(a ...interface{}) {
 	a = append([]interface{}{"❗ ~ "}, a...)
 	d.InfoLn(color.New(color.Bold).Sprint(a...))
@@ -184,7 +196,7 @@ func (d *PrettyLogger) WarnFWithoutLn(format string, a ...interface{}) {
 }
 
 func (d *PrettyLogger) JSON(content []byte) {
-	d.InfoLn(prettyJSON(content))
+	d.InfoF(prettyJSON(content))
 }
 
 func (d *PrettyLogger) Write(content []byte) (int, error) {

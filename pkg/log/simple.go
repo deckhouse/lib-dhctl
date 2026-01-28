@@ -85,6 +85,9 @@ func (d *SimpleLogger) InfoFWithoutLn(format string, a ...interface{}) {
 	d.logger.Info(fmt.Sprintf(format, a...))
 }
 
+// InfoLn
+// Deprecated:
+// Use InfoF(string) it add \n to end
 func (d *SimpleLogger) InfoLn(a ...interface{}) {
 	d.logger.Info(listToString(a))
 }
@@ -93,6 +96,9 @@ func (d *SimpleLogger) ErrorFWithoutLn(format string, a ...interface{}) {
 	d.logger.Error(fmt.Sprintf(format, a...))
 }
 
+// ErrorLn
+// Deprecated:
+// Use ErrorF(string) it add \n to end
 func (d *SimpleLogger) ErrorLn(a ...interface{}) {
 	d.logger.Error(listToString(a))
 }
@@ -103,6 +109,9 @@ func (d *SimpleLogger) DebugFWithoutLn(format string, a ...interface{}) {
 	}
 }
 
+// DebugLn
+// Deprecated:
+// Use DebugF(string) it add \n to end
 func (d *SimpleLogger) DebugLn(a ...interface{}) {
 	if d.isDebug {
 		d.logger.Debug(listToString(a))
@@ -126,6 +135,9 @@ func (d *SimpleLogger) WarnFWithoutLn(format string, a ...interface{}) {
 	d.logger.Warn(fmt.Sprintf(format, a...))
 }
 
+// WarnLn
+// Deprecated:
+// Use WarnF(string) it add \n to end
 func (d *SimpleLogger) WarnLn(a ...interface{}) {
 	d.logger.Warn(listToString(a))
 }
