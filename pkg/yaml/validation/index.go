@@ -64,6 +64,8 @@ func ParseIndex(reader io.Reader, opts ...ParseIndexOption) (*SchemaIndex, error
 		return nil, fmt.Errorf("%w: %w", ErrRead, err)
 	}
 
+	// we cannot use yaml.UnmarshalStrict here
+	// because strict unmarshal also verify that another keys not present
 	if err := contentHasMultipleSchemaKeys(content); err != nil {
 		return nil, err
 	}
