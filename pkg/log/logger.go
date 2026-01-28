@@ -128,6 +128,7 @@ type baseLogger interface {
 	WarnFWithoutLn(format string, a ...interface{})
 
 	// WarnLn
+	//
 	// Deprecated: Use WarnF(string) it add \n to end
 	WarnLn(a ...interface{})
 
