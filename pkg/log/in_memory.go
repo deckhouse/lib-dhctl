@@ -248,7 +248,7 @@ func (l *InMemoryLogger) JSON(s []byte) {
 }
 
 func (l *InMemoryLogger) ProcessLogger() ProcessLogger {
-	return l
+	return newInMemoryProcessLogger(l, l.parent.ProcessLogger())
 }
 
 func (l *InMemoryLogger) SilentLogger() *SilentLogger {
@@ -262,18 +262,6 @@ func (l *InMemoryLogger) BufferLogger(buffer *bytes.Buffer) Logger {
 func (l *InMemoryLogger) Write(s []byte) (int, error) {
 	l.writeEntity(string(s))
 	return l.parent.Write(s)
-}
-
-func (l *InMemoryLogger) ProcessStart(name string) {
-	l.writeEntityFormatted("Start process: %s", name)
-}
-
-func (l *InMemoryLogger) ProcessFail() {
-	l.writeEntityWithPrefix(l.errorPrefix, "Fail process")
-}
-
-func (l *InMemoryLogger) ProcessEnd() {
-	l.writeEntity("End process")
 }
 
 func (l *InMemoryLogger) match(m *Match, entity string) bool {
@@ -335,4 +323,31 @@ func (l *InMemoryLogger) writeEntityWithPrefix(prefix, f string, a ...any) {
 	}
 
 	l.writeEntity(msg)
+}
+
+type inMemoryProcessLogger struct {
+	parent   ProcessLogger
+	inMemory *InMemoryLogger
+}
+
+func newInMemoryProcessLogger(inMemory *InMemoryLogger, parent ProcessLogger) *inMemoryProcessLogger {
+	return &inMemoryProcessLogger{
+		parent:   parent,
+		inMemory: inMemory,
+	}
+}
+
+func (l *inMemoryProcessLogger) ProcessStart(name string) {
+	l.parent.ProcessStart(name)
+	l.inMemory.writeEntityFormatted("Start process: %s", name)
+}
+
+func (l *inMemoryProcessLogger) ProcessFail() {
+	l.parent.ProcessFail()
+	l.inMemory.writeEntityWithPrefix(l.inMemory.errorPrefix, "Fail process")
+}
+
+func (l *inMemoryProcessLogger) ProcessEnd() {
+	l.parent.ProcessEnd()
+	l.inMemory.writeEntity("End process")
 }
