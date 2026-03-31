@@ -16,6 +16,7 @@ package validation
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/go-openapi/spec"
@@ -24,6 +25,10 @@ import (
 
 const (
 	xRulesExtension = "x-rules"
+)
+
+var (
+	ErrValidationRuleFailed = errors.New("validation rule failed")
 )
 
 type (
@@ -131,4 +136,8 @@ func (v *ExtensionsValidator) validateData(data json.RawMessage, schema spec.Sch
 	}
 
 	return nil
+}
+
+func NewExtensionsRuleError(msg string, err error) error {
+	return fmt.Errorf("%w: %s: %w", ErrValidationRuleFailed, msg, err)
 }
