@@ -315,7 +315,7 @@ func (l *Loop) run(ctx context.Context, task func() error) error {
 			// Run task and return if everything is ok.
 			err = task()
 			if err == nil {
-				l.logger.Success(l.prefix + "Succeeded!\n")
+				l.logger.Success(l.prefix + "Succeeded!")
 				return nil
 			}
 
