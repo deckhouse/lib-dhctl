@@ -150,6 +150,20 @@ func TestPrettyDebugStream(t *testing.T) {
 	})
 }
 
+func TestPrettySuccessNewLine(t *testing.T) {
+	outBuffer := &bytes.Buffer{}
+	debugBuffer := &bytes.Buffer{}
+
+	pretty := NewPrettyLogger(LoggerOptions{
+		IsDebug:     false,
+		OutStream:   outBuffer,
+		DebugStream: debugBuffer,
+	})
+	pretty.Success("My Task")
+
+	assertInBuffer(t, outBuffer, "My Task\n", true)
+}
+
 func TestPrettyFollowInterfaces(t *testing.T) {
 	assertFollowAllInterfaces(t, NewPrettyLogger(LoggerOptions{IsDebug: true}))
 }
