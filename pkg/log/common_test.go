@@ -17,6 +17,7 @@ package log
 import (
 	"bytes"
 	"fmt"
+	"regexp"
 	"testing"
 
 	"github.com/name212/govalue"
@@ -30,6 +31,20 @@ func assertInBuffer(t *testing.T, buf *bytes.Buffer, msg string, inOut bool) {
 		assert = require.Contains
 	}
 	assert(t, out, msg)
+}
+
+func assertInBufferAsRe(t *testing.T, buf *bytes.Buffer, msg string, inOut bool) {
+	out := buf.String()
+
+	re, err := regexp.Compile(msg)
+	require.NoError(t, err, "should compile: %s", msg)
+
+	assert := require.False
+	if inOut {
+		assert = require.True
+	}
+
+	assert(t, re.MatchString(out), "should match to %s", msg)
 }
 
 func assertFollowAllInterfaces(t *testing.T, logger Logger) {
