@@ -45,5 +45,9 @@ func (w *formatWithNewLineLoggerWrapper) WarnF(format string, a ...any) {
 
 func addLnToFormat(format string) string {
 	// remove last new line to avoid add double new lines
-	return strings.TrimSuffix(format, "\n") + "\n"
+	return trimLn(format) + "\n"
+}
+
+func trimLn(s string) string {
+	return strings.TrimSuffix(s, "\n")
 }
