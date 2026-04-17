@@ -164,6 +164,21 @@ func TestPrettySuccessNewLine(t *testing.T) {
 	assertInBuffer(t, outBuffer, "My Task\n", true)
 }
 
+func TestPrettySuccessTrimNewLineFromMessage(t *testing.T) {
+	outBuffer := &bytes.Buffer{}
+	debugBuffer := &bytes.Buffer{}
+
+	pretty := NewPrettyLogger(LoggerOptions{
+		IsDebug:     false,
+		OutStream:   outBuffer,
+		DebugStream: debugBuffer,
+	})
+	pretty.Success("My Task\n")
+
+	assertInBuffer(t, outBuffer, "My Task\n", true)
+	assertInBuffer(t, outBuffer, "My Task\n\n", false)
+}
+
 func TestPrettyFollowInterfaces(t *testing.T) {
 	assertFollowAllInterfaces(t, NewPrettyLogger(LoggerOptions{IsDebug: true}))
 }

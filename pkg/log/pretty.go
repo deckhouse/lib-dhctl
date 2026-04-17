@@ -171,7 +171,7 @@ func (d *PrettyLogger) DebugLn(a ...interface{}) {
 }
 
 func (d *PrettyLogger) Success(l string) {
-	d.InfoF("🎉 %s", l)
+	d.InfoF("🎉 %s", trimLn(l))
 }
 
 func (d *PrettyLogger) Fail(l string) {
