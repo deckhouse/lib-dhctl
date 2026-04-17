@@ -17,6 +17,8 @@ package log
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"os"
 	"regexp"
 	"testing"
 
@@ -154,6 +156,143 @@ func TestTeeLogger(t *testing.T) {
 
 		assertInTeeAll(t, allLogsAfterClose, false)
 	})
+}
+
+func TestTeeLoggerReturnCorrectProcessLogger(t *testing.T) {
+	const (
+		correctFirst = "First Correct process"
+		failFirst    = "First Fail process"
+
+		correctSecond = "Second Correct process"
+		failSecond    = "Second Fail process"
+	)
+
+	doProcess := func(l *TeeLogger, c, f string) {
+		p := l.ProcessLogger()
+
+		p.ProcessStart(c)
+		p.ProcessEnd()
+
+		p.ProcessStart(f)
+		p.ProcessFail()
+	}
+
+	doProcessMultiple := func(l *TeeLogger) {
+		doProcess(l, correctFirst, failFirst)
+		doProcess(l, correctSecond, failSecond)
+
+		l.FlushAndClose()
+	}
+
+	type test struct {
+		name     string
+		provider func(*testWriterCloser) Logger
+		before   func(*testing.T, *testWriterCloser)
+		after    func(*testing.T, *testWriterCloser)
+		messages []string
+	}
+
+	assertTee := func(t *testing.T, tst test) {
+		writer := newTestWriterCloser()
+		if tst.before != nil {
+			tst.before(t, writer)
+		}
+
+		tee, err := NewTeeLogger(tst.provider(writer), writer, 1024)
+		require.NoError(t, err)
+
+		doProcessMultiple(tee)
+
+		if tst.after != nil {
+			tst.after(t, writer)
+		}
+
+		for _, m := range tst.messages {
+			assertInBufferAsRe(t, writer.writer, m, true)
+		}
+	}
+
+	originalStdout := os.Stdout
+
+	dummyReader, dummyWriter, err := os.Pipe()
+	require.NoError(t, err, "should create pipe for dummy")
+
+	constructWrappedMessages := func(c, f string) []string {
+		return []string{
+			c,
+			fmt.Sprintf("%s (.+)", c),
+			f,
+			fmt.Sprintf("%s FAILED (.+)", f),
+		}
+	}
+
+	wrapperMessages := append(
+		constructWrappedMessages(correctFirst, failFirst),
+		constructWrappedMessages(correctSecond, failSecond)...,
+	)
+
+	constructPrettyMessages := func(c, f string) []string {
+		return []string{
+			fmt.Sprintf("┌ %s", c),
+			fmt.Sprintf("└ %s (.+)", c),
+			fmt.Sprintf("┌ %s", f),
+			fmt.Sprintf("└ %s (.+) FAILED", f),
+		}
+	}
+
+	tests := []test{
+		{
+			name: "pretty",
+			provider: func(w *testWriterCloser) Logger {
+				return NewPrettyLogger(LoggerOptions{
+					IsDebug:   false,
+					OutStream: w,
+				})
+			},
+			messages: append(
+				constructPrettyMessages(correctFirst, failFirst),
+				constructPrettyMessages(correctSecond, failSecond)...,
+			),
+		},
+		{
+			name: "dummy",
+			provider: func(twc *testWriterCloser) Logger {
+				return NewDummyLogger(false)
+			},
+			before: func(t *testing.T, w *testWriterCloser) {
+				os.Stdout = dummyWriter
+			},
+			after: func(t *testing.T, w *testWriterCloser) {
+				os.Stdout = originalStdout
+
+				err = dummyWriter.Close()
+				require.NoError(t, err, "should close dummy writer")
+
+				_, err := io.Copy(w, dummyReader)
+				require.NoError(t, err, "should copy from pipe for dummy")
+
+				err = dummyReader.Close()
+				require.NoError(t, err, "should close dummy reader")
+			},
+			messages: wrapperMessages,
+		},
+		{
+			name: "simple",
+			provider: func(w *testWriterCloser) Logger {
+				return NewSimpleLogger(LoggerOptions{
+					IsDebug:   false,
+					OutStream: w,
+				})
+			},
+			messages: wrapperMessages,
+		},
+	}
+
+	for _, tst := range tests {
+		t.Run(tst.name, func(t *testing.T) {
+			assertTee(t, tst)
+		})
+	}
 }
 
 func TestTeeLoggerFollowInterfaces(t *testing.T) {
