@@ -15,11 +15,13 @@
 package log
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"strings"
 
 	"github.com/name212/govalue"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
 )
 
@@ -60,6 +62,20 @@ func WithKlogSanitizer(sanitizer Sanitizer) KlogOpt {
 func InitKlog(logger Logger, opts ...KlogOpt) error {
 	if govalue.IsNil(logger) {
 		return fmt.Errorf("logger is not provided to init klog")
+	}
+
+	utilruntime.ErrorHandlers = []utilruntime.ErrorHandler{
+		func(ctx context.Context, err error, msg string, keysAndValues ...interface{}) {
+			fullMsg := utilruntime.ErrorToString(err, msg, keysAndValues...)
+
+			logger.DebugFWithoutLn("klog runtime error: %s", fullMsg)
+		},
+	}
+
+	utilruntime.PanicHandlers = []func(context.Context, interface{}){
+		func(ctx context.Context, r interface{}) {
+			logger.DebugFWithoutLn("klog runtime panic: %v", r)
+		},
 	}
 
 	optsForSet := &KlogOptions{
