@@ -13,7 +13,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/werf/logboek v0.5.5
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/apimachinery v0.35.5
+	k8s.io/apimachinery v0.33.12
 	k8s.io/klog/v2 v2.140.0
 	sigs.k8s.io/yaml v1.6.0
 )
