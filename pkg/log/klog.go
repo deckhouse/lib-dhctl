@@ -66,7 +66,8 @@ func InitKlog(logger Logger, opts ...KlogOpt) error {
 
 	utilruntime.ErrorHandlers = []utilruntime.ErrorHandler{
 		func(ctx context.Context, err error, msg string, keysAndValues ...interface{}) {
-			fullMsg := utilruntime.ErrorToString(err, msg, keysAndValues...)
+			kvs := fmt.Sprintf("%v", keysAndValues...)
+			fullMsg := fmt.Sprintf("%s: %s, %v", msg, err.Error(), kvs)
 
 			logger.DebugFWithoutLn("klog runtime error: %s", fullMsg)
 		},
