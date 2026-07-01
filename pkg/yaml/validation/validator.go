@@ -16,11 +16,13 @@ package validation
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 
-	"github.com/deckhouse/lib-dhctl/pkg/log"
+	"github.com/deckhouse/lib-dhctl/pkg/logger"
 	"github.com/deckhouse/lib-dhctl/pkg/yaml/validation/transformer"
 
 	"github.com/go-openapi/spec"
@@ -62,13 +64,13 @@ type PreValidator interface {
 	// Validate
 	// if validator does not provide our own schema please return nil
 	// will use schema getting for index
-	Validate(doc []byte, logger log.Logger) (*spec.Schema, error)
+	Validate(doc []byte, logger *slog.Logger) (*spec.Schema, error)
 }
 
 type Validator struct {
 	schemas              map[SchemaIndex]*spec.Schema
 	preValidators        map[SchemaIndex]PreValidator
-	loggerProvider       log.LoggerProvider
+	vLogger              *slog.Logger
 	versionFallbacks     map[string]string
 	transformers         map[SchemaIndex][]transformer.SchemaTransformer
 	defaultTransformers  []transformer.SchemaTransformer
@@ -76,17 +78,17 @@ type Validator struct {
 }
 
 func NewValidator(schemas map[SchemaIndex]*spec.Schema) *Validator {
-	return NewValidatorWithLogger(schemas, log.SilentLoggerProvider())
+	return NewValidatorWithLogger(schemas, logger.FromContext(context.Background()))
 }
 
-func NewValidatorWithLogger(schemas map[SchemaIndex]*spec.Schema, loggerProvider log.LoggerProvider) *Validator {
+func NewValidatorWithLogger(schemas map[SchemaIndex]*spec.Schema, l *slog.Logger) *Validator {
 	if len(schemas) == 0 {
 		schemas = make(map[SchemaIndex]*spec.Schema)
 	}
 	return &Validator{
-		schemas:        schemas,
-		loggerProvider: loggerProvider,
-		preValidators:  make(map[SchemaIndex]PreValidator),
+		schemas:       schemas,
+		vLogger:       l,
+		preValidators: make(map[SchemaIndex]PreValidator),
 		versionFallbacks: map[string]string{
 			"deckhouse.io/v1alpha1": "deckhouse.io/v1",
 		},
@@ -129,8 +131,8 @@ func (v *Validator) AddVersionFallback(failVersion, fallback string) *Validator 
 	return v
 }
 
-func (v *Validator) SetLogger(loggerProvider log.LoggerProvider) *Validator {
-	v.loggerProvider = loggerProvider
+func (v *Validator) SetLogger(logger *slog.Logger) *Validator {
+	v.vLogger = logger
 
 	return v
 }
@@ -186,7 +188,7 @@ func (v *Validator) ValidateWithIndex(index *SchemaIndex, doc *[]byte, opts ...V
 	}
 
 	if schema == nil {
-		v.logger().DebugF("No schema for index %s. Skip it", index.String())
+		v.logger().DebugContext(context.Background(), fmt.Sprintf("No schema for index %s. Skip it", index.String()))
 		// we need return error because on top level we want filter documents without index and move into resources
 		return ErrSchemaNotFound
 	}
@@ -251,7 +253,7 @@ func (v *Validator) getSchemaWithFallback(index *SchemaIndex) *spec.Schema {
 
 	fallback, ok := v.versionFallbacks[index.Version]
 	if !ok || fallback == "" {
-		v.logger().DebugF("No fallback schema for version %s", index.Version)
+		v.logger().DebugContext(context.Background(), fmt.Sprintf("No fallback schema for version %s", index.Version))
 		return nil
 	}
 
@@ -302,6 +304,6 @@ func (v *Validator) openAPIValidate(dataObj *[]byte, schema *spec.Schema, option
 	return true, nil
 }
 
-func (v *Validator) logger() log.Logger {
-	return log.SafeProvideLogger(v.loggerProvider)
+func (v *Validator) logger() *slog.Logger {
+	return v.vLogger
 }
