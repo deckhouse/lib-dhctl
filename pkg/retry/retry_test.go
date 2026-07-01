@@ -132,31 +132,6 @@ func TestSilentLoop(t *testing.T) {
 	require.Len(t, matches, 0)
 }
 
-func TestGlobalDefaultLogger(t *testing.T) {
-	p, logger := testLoopParamsWithLogger()
-	SetGlobalDefaultLogger(logger)
-
-	empty := NewEmptyParams()
-	require.Equal(t, logger, empty.Logger())
-
-	const loopName = "some loop"
-
-	loopParamsForCheckLogs := p.Clone(WithName(loopName))
-	require.Equal(t, logger, loopParamsForCheckLogs.Logger())
-
-	// check use default logger
-	loop := NewLoop(loopParamsForCheckLogs.Name(), loopParamsForCheckLogs.Attempts(), loopParamsForCheckLogs.Wait())
-	err := loop.Run(func() error {
-		return nil
-	})
-	require.NoError(t, err)
-
-	matches, err := logger.AllMatches(stringSubmatch(loopName))
-	require.NoError(t, err)
-	// start and end
-	require.Len(t, matches, 2)
-}
-
 func TestGlobalGlobalInterruptChecker(t *testing.T) {
 	interrupted := false
 	checker := func() bool {
@@ -182,7 +157,6 @@ func TestGlobalGlobalInterruptChecker(t *testing.T) {
 func testLoopParamsWithLogger() (Params, *log.InMemoryLogger) {
 	logger := log.NewInMemoryLoggerWithParent(log.NewDummyLogger(false))
 	return NewEmptyParams(
-		WithLogger(logger),
 		WithName("test loop"),
 		WithWait(30*time.Millisecond),
 		WithAttempts(3),

@@ -16,8 +16,6 @@ package retry
 
 import (
 	"github.com/name212/govalue"
-
-	"github.com/deckhouse/lib-dhctl/pkg/log"
 )
 
 type GlobalInterruptChecker func() bool
@@ -30,30 +28,6 @@ func SetGlobalInterruptChecker(checker GlobalInterruptChecker) {
 	globalInterruptChecker = checker
 }
 
-// SetGlobalDefaultLogger
-// Deprecated:
-// global logger used for backward compatibility in dhctl with
-// deprecated functions NewLoop and NewSilentLoop
-// Please use NewLoopWithParams and NewSilentLoopWithParams
-func SetGlobalDefaultLogger(logger log.Logger) {
-	if govalue.IsNil(logger) {
-		return
-	}
-
-	defaultLogger = logger
-}
-
 var (
 	globalInterruptChecker GlobalInterruptChecker = func() bool { return false }
-	defaultLogger          log.Logger             = log.NewDummyLogger(false)
-	silentLogger                                  = log.NewSilentLogger()
 )
-
-func getDefaultSilentLogger() *log.SilentLogger {
-	switch defaultLogger.(type) {
-	case *log.TeeLogger:
-		return defaultLogger.SilentLogger()
-	default:
-		return silentLogger
-	}
-}
