@@ -122,7 +122,6 @@ func TestSilentLoop(t *testing.T) {
 		return errors.New("error")
 	})
 	require.Error(t, err)
-
 }
 
 func TestGlobalGlobalInterruptChecker(t *testing.T) {

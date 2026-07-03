@@ -146,6 +146,7 @@ func (p *params) Clone(overrides ...ParamsBuilderOpt) Params {
 		return nil
 	}
 
+	// nolint:prealloc
 	cloneOpts := []ParamsBuilderOpt{
 		WithName("%s", p.Name()),
 		WithAttempts(p.Attempts()),
