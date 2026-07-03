@@ -17,15 +17,11 @@ package retry
 import (
 	"context"
 	"errors"
-	"fmt"
-	"regexp"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/deckhouse/lib-dhctl/pkg/log"
 )
 
 func TestLoopRunSuccessOnFirstAttempt(t *testing.T) {
@@ -120,16 +116,13 @@ func TestLoopRunDeadlineExceeded(t *testing.T) {
 }
 
 func TestSilentLoop(t *testing.T) {
-	p, logger := testLoopParamsWithLogger()
+	p := testLoopParams()
 	loop := NewSilentLoopWithParams(p)
 	err := loop.Run(func() error {
 		return errors.New("error")
 	})
 	require.Error(t, err)
 
-	matches, err := logger.AllMatches(stringSubmatch("test loop"))
-	require.NoError(t, err)
-	require.Len(t, matches, 0)
 }
 
 func TestGlobalGlobalInterruptChecker(t *testing.T) {
@@ -154,24 +147,10 @@ func TestGlobalGlobalInterruptChecker(t *testing.T) {
 	require.Equal(t, 2, attempt)
 }
 
-func testLoopParamsWithLogger() (Params, *log.InMemoryLogger) {
-	logger := log.NewInMemoryLoggerWithParent(log.NewDummyLogger(false))
+func testLoopParams() Params {
 	return NewEmptyParams(
 		WithName("test loop"),
 		WithWait(30*time.Millisecond),
 		WithAttempts(3),
-	), logger
-}
-
-func stringSubmatch(s string) *log.Match {
-	escaped := regexp.QuoteMeta(s)
-	exp := fmt.Sprintf(".*%s.*", escaped)
-	return &log.Match{
-		Regex: []*regexp.Regexp{regexp.MustCompile(exp)},
-	}
-}
-
-func testLoopParams() Params {
-	p, _ := testLoopParamsWithLogger()
-	return p
+	)
 }
