@@ -58,3 +58,15 @@ func FailRetry(ctx context.Context, l *slog.Logger, msg string) {
 func JSON(ctx context.Context, l *slog.Logger, data []byte) {
 	l.InfoContext(ctx, string(data))
 }
+
+func ProcessStart(ctx context.Context, l *slog.Logger, name string) {
+	emit(ctx, l, slog.LevelInfo, "Starting: "+name, processAttr(processStart, name))
+}
+
+func ProcessEnd(ctx context.Context, l *slog.Logger, name string) {
+	emit(ctx, l, slog.LevelInfo, "Finished: "+name, processAttr(processEnd, name))
+}
+
+func ProcessFailed(ctx context.Context, l *slog.Logger, name string) {
+	emit(ctx, l, slog.LevelError, "Failed: "+name, processAttr(processFail, name))
+}

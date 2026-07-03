@@ -15,8 +15,10 @@
 package validation
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 	"testing"
 
@@ -24,7 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/yaml"
 
-	"github.com/deckhouse/lib-dhctl/pkg/log"
+	"github.com/deckhouse/lib-dhctl/pkg/logger"
 	"github.com/deckhouse/lib-dhctl/pkg/yaml/validation/transformer"
 )
 
@@ -532,12 +534,8 @@ var (
 	}
 )
 
-func testGetLogger() log.LoggerProvider {
-	return log.SimpleLoggerProvider(
-		log.NewInMemoryLoggerWithParent(
-			log.NewPrettyLogger(log.LoggerOptions{IsDebug: true}),
-		),
-	)
+func testGetLogger() *slog.Logger {
+	return logger.FromContext(context.Background())
 }
 
 type testPrivateKey struct {
@@ -581,7 +579,7 @@ func newTestKindPreValidator(t *testing.T, schema string) *testKindPreValidator 
 	return r
 }
 
-func (p *testKindPreValidator) Validate(doc []byte, _ log.Logger) (*spec.Schema, error) {
+func (p *testKindPreValidator) Validate(doc []byte, _ *slog.Logger) (*spec.Schema, error) {
 	v := testKind{}
 	err := yaml.Unmarshal(doc, &v)
 	if err != nil {

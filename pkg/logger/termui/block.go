@@ -277,7 +277,7 @@ func (b *Block) SetAction(text string) {
 func (b *Block) Warn(line string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.paused {
+	if b.paused || !b.active {
 		b.passthroughLocked(line)
 		return
 	}
@@ -301,7 +301,7 @@ func (b *Block) writeLineLocked(line string) {
 func (b *Block) Log(line string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.paused {
+	if b.paused || !b.active {
 		b.passthroughLocked(line)
 		return
 	}

@@ -46,6 +46,7 @@ const actionPrefix = "Current action: "
 // Banner lines (if any) are pinned at the very top; they are omitted when the terminal
 // is too short (frameLocked already leaves banner nil in that case).
 func renderFrame(f frame) []string {
+	// nolint:prealloc
 	var out []string
 	for _, bl := range f.banner {
 		out = append(out, trunc(bl, f.width-1))
