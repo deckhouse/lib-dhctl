@@ -24,6 +24,8 @@ import (
 	"github.com/go-openapi/spec"
 )
 
+const defaultSchemasDir = "/deckhouse/candi/openapi"
+
 func loadSchemasDir(schemasDir []string) (map[SchemaIndex]*spec.Schema, error) {
 	initMap := make(map[SchemaIndex]*spec.Schema)
 
@@ -74,6 +76,8 @@ func isYAMLFile(path string) bool {
 }
 
 func ValidateData(schemasDir []string, data []byte) error {
+	// add default candi dir
+	schemasDir = append(schemasDir, defaultSchemasDir)
 	initMap, err := loadSchemasDir(schemasDir)
 	if err != nil {
 		return fmt.Errorf("failed to load schemas: %w", err)
