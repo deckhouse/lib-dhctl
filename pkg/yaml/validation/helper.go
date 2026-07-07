@@ -75,7 +75,7 @@ func isYAMLFile(path string) bool {
 	return ext == ".yml" || ext == ".yaml"
 }
 
-func ValidateData(schemasDir []string, data []byte) error {
+func ValidateData(schemasDir []string, data *[]byte) error {
 	// add default candi dir
 	schemasDir = append(schemasDir, defaultSchemasDir)
 	initMap, err := loadSchemasDir(schemasDir)
@@ -84,7 +84,7 @@ func ValidateData(schemasDir []string, data []byte) error {
 	}
 
 	validator := NewValidator(initMap)
-	_, err = validator.Validate(&data)
+	_, err = validator.Validate(data)
 
 	return err
 }
