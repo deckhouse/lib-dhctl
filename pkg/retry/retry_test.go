@@ -194,9 +194,10 @@ func TestGlobalGlobalInterruptChecker(t *testing.T) {
 }
 
 func testLoopParams(extraOpts ...ParamsBuilderOpt) Params {
+	// nolint:prealloc
 	opts := []ParamsBuilderOpt{
 		WithName("test loop"),
-		WithWait(30*time.Millisecond),
+		WithWait(30 * time.Millisecond),
 		WithAttempts(3),
 	}
 	opts = append(opts, extraOpts...)
