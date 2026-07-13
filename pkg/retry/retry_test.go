@@ -124,6 +124,53 @@ func TestSilentLoop(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestLoopRunWhitelistStopsOnNonWhitelistedError(t *testing.T) {
+	whitelistedErr := errors.New("whitelisted error")
+	otherErr := errors.New("other error")
+
+	attempt := 0
+	loop := NewLoopWithParams(testLoopParams(WithWhitelist(whitelistedErr)))
+	err := loop.Run(func() error {
+		attempt++
+		return otherErr
+	})
+
+	require.ErrorIs(t, err, otherErr)
+	require.Equal(t, 1, attempt)
+}
+
+func TestLoopRunWhitelistRetriesOnWhitelistedError(t *testing.T) {
+	whitelistedErr := errors.New("whitelisted error")
+
+	attempt := 0
+	loop := NewLoopWithParams(testLoopParams(WithWhitelist(whitelistedErr)))
+	err := loop.Run(func() error {
+		attempt++
+		if attempt < 3 {
+			return whitelistedErr
+		}
+		return nil
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, 3, attempt)
+}
+
+func TestLoopRunWhitelistEmptyBehavesAsUnset(t *testing.T) {
+	attempt := 0
+	loop := NewLoopWithParams(testLoopParams(WithWhitelist()))
+	err := loop.Run(func() error {
+		attempt++
+		if attempt < 3 {
+			return errors.New("temporary error")
+		}
+		return nil
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, 3, attempt)
+}
+
 func TestGlobalGlobalInterruptChecker(t *testing.T) {
 	interrupted := false
 	checker := func() bool {
@@ -146,10 +193,13 @@ func TestGlobalGlobalInterruptChecker(t *testing.T) {
 	require.Equal(t, 2, attempt)
 }
 
-func testLoopParams() Params {
-	return NewEmptyParams(
+func testLoopParams(extraOpts ...ParamsBuilderOpt) Params {
+	opts := []ParamsBuilderOpt{
 		WithName("test loop"),
 		WithWait(30*time.Millisecond),
 		WithAttempts(3),
-	)
+	}
+	opts = append(opts, extraOpts...)
+
+	return NewEmptyParams(opts...)
 }
