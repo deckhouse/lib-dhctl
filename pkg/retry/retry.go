@@ -376,16 +376,16 @@ func (l *Loop) run(ctx context.Context, task func() error) error {
 				return err
 			}
 
-			logger.FailRetry(ctx, l.logger, fmt.Sprintf(l.prefix+attemptMessage, i, l.attemptsQuantity, l.name, l.waitTime))
+			// Per-attempt diagnostics are Debug-only (file, not terminal): a loop that's
+			// going to succeed after a few retries shouldn't spam the compact view with
+			// one line per attempt. Only the final exhaustion error (returned below if
+			// every attempt fails) is meant to surface to the caller.
+			l.logger.DebugContext(ctx, fmt.Sprintf(l.prefix+attemptMessage, i, l.attemptsQuantity, l.name, l.waitTime))
 			errorMsg := "\t%v\n\n"
 			if l.showError {
 				errorMsg = "\tStatus: %v\n\n"
 			}
-			if l.silent {
-				l.logger.DebugContext(ctx, fmt.Sprintf(l.prefix+errorMsg, err))
-			} else {
-				l.logger.InfoContext(ctx, fmt.Sprintf(l.prefix+errorMsg, err))
-			}
+			l.logger.DebugContext(ctx, fmt.Sprintf(l.prefix+errorMsg, err))
 
 			// Do not waitTime after the last iteration.
 			if i < l.attemptsQuantity {
