@@ -171,6 +171,23 @@ func TestLoopRunWhitelistEmptyBehavesAsUnset(t *testing.T) {
 	require.Equal(t, 3, attempt)
 }
 
+func TestLoopRunInTestEnvironmentCollapsesToSingleAttempt(t *testing.T) {
+	InTestEnvironment = true
+	defer func() { InTestEnvironment = false }()
+
+	attempt := 0
+	start := time.Now()
+	loop := NewLoopWithParams(testLoopParams())
+	err := loop.Run(func() error {
+		attempt++
+		return errors.New("error")
+	})
+
+	require.Error(t, err)
+	require.Equal(t, 1, attempt)
+	require.Less(t, time.Since(start), 30*time.Millisecond)
+}
+
 func TestGlobalGlobalInterruptChecker(t *testing.T) {
 	interrupted := false
 	checker := func() bool {

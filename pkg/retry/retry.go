@@ -34,6 +34,17 @@ const (
 	NotSetName = "Name not set"
 )
 
+// InTestEnvironment, when set, collapses every loop to a single, wait-free
+// attempt so tests exercising retry-driven code don't pay real wall-clock time.
+var InTestEnvironment = false
+
+func setupTests(attemptsQuantity *int, wait *time.Duration) {
+	if InTestEnvironment {
+		*attemptsQuantity = 1
+		*wait = 0 * time.Second
+	}
+}
+
 type BreakPredicate func(err error) bool
 
 func IsErr(err error) BreakPredicate {
@@ -327,6 +338,8 @@ func (l *Loop) RunContext(ctx context.Context, task func() error) error {
 }
 
 func (l *Loop) run(ctx context.Context, task func() error) error {
+	setupTests(&l.attemptsQuantity, &l.waitTime)
+
 	if l.attemptsQuantity < 1 {
 		return fmt.Errorf("Attempts quantity must be greater than zero for loop '%s'", l.name)
 	}
