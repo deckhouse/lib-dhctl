@@ -81,13 +81,20 @@ func TestHandlerTaggedRecordOnTTY(t *testing.T) {
 	}
 }
 
-func TestHandlerNonTTYNeverWritesTerminal(t *testing.T) {
-	var file, tty bytes.Buffer
-	l := slog.New(newTestHandler(&file, &tty, false))
+func TestHandlerNonTTYWritesPlainOutput(t *testing.T) {
+	var file, output bytes.Buffer
+
+	l := slog.New(newTestHandler(&file, &output, false))
 	l.Info("tagged but no tty", ShowInCompacted())
-	if tty.Len() != 0 {
-		t.Fatalf("tty must be empty on non-tty, got %q", tty.String())
+
+	if !strings.Contains(output.String(), "tagged but no tty") {
+		t.Fatalf("non-TTY output missing record: %q", output.String())
 	}
+
+	if strings.Contains(output.String(), "\x1b[") {
+		t.Fatalf("non-TTY output must not contain ANSI sequences: %q", output.String())
+	}
+
 	if !strings.Contains(file.String(), "tagged but no tty") {
 		t.Fatalf("file must still get record: %q", file.String())
 	}

@@ -95,3 +95,23 @@ func TestNewRootNoTTYWriterMeansFileOnly(t *testing.T) {
 		t.Fatalf("file missing record: %q", file.String())
 	}
 }
+
+func TestNewRootNonTTYWritesErrorToOutput(t *testing.T) {
+	var file, output bytes.Buffer
+
+	l := NewRoot(Options{
+		FileWriter: &file,
+		TTYWriter:  &output,
+		IsTTY:      false,
+	})
+
+	l.Error("test error")
+
+	if !strings.Contains(output.String(), "test error") {
+		t.Fatalf("non-TTY output missing error: %q", output.String())
+	}
+
+	if !strings.Contains(file.String(), "test error") {
+		t.Fatalf("file sink missing error: %q", file.String())
+	}
+}

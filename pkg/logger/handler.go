@@ -28,14 +28,16 @@ import (
 
 // TerminalUIHandler is a dual-sink slog.Handler.
 //   - File sink: receives every enabled record (JSON).
-//   - TTY sink:  receives only records tagged with ShowInCompacted(), and only when stdout is a terminal.
+//   - Output sink, when configured, uses interactive terminal rendering for TTYs
+//     and plain linear rendering for non-TTY consumers.
 type TerminalUIHandler struct {
 	file  slog.Handler
-	tty   slog.Handler // nil when not a TTY
+	tty   slog.Handler // nil when no output writer is configured
 	level slog.Leveler
-	// verbose (the -v flag) makes the terminal sink show EVERY record at Info+, not just
-	// ShowInCompacted()-tagged ones. The file sink always receives everything regardless. DEBUG
-	// records never reach the terminal (the file sink keeps them); DHCTL_DEBUG only enriches the file.
+	// verbose (the -v flag) makes the output sink show every Info+ record,
+	// not just ShowInCompacted()-tagged ones. The file sink always receives
+	// everything regardless. DEBUG records never reach the output sink;
+	// DHCTL_DEBUG only enriches the file.
 	verbose bool
 	// compactTagged is true when a ShowInCompacted() marker was applied via WithAttrs (e.g. logger.With(ShowInCompacted())).
 	// Such handler-level tagging never reaches the record passed to Handle, so we track it here.
@@ -57,11 +59,11 @@ func handlerOptions(level slog.Leveler) *slog.HandlerOptions {
 // especially the three bools (isTTY/interactive/verbose) — keeps call sites self-documenting.
 type handlerConfig struct {
 	fileW       io.Writer    // always-on file sink; required
-	ttyW        io.Writer    // terminal sink stream; nil disables the terminal sink
-	isTTY       bool         // ttyW is a terminal (enables the terminal sink at all)
+	ttyW        io.Writer    // output stream; nil disables external output
+	isTTY       bool         // whether ttyW is connected to an interactive terminal
 	interactive bool         // prefer the pinned live block when the terminal supports it
 	level       slog.Leveler // file-sink threshold (Debug in practice)
-	verbose     bool         // -v: terminal shows every record, not just curated output
+	verbose     bool         // -v: output stream shows every Info+ record
 }
 
 func newTerminalUIHandler(cfg handlerConfig) *TerminalUIHandler {
@@ -70,12 +72,12 @@ func newTerminalUIHandler(cfg handlerConfig) *TerminalUIHandler {
 		level:   cfg.level,
 		verbose: cfg.verbose,
 	}
-	if cfg.isTTY && cfg.ttyW != nil {
+	if cfg.ttyW != nil {
 		// Pick the terminal backend. The live termui block is only used when interactive AND the writer
 		// is a real terminal AND the terminal is tall enough; otherwise (non-interactive -v dump, a tiny
 		// terminal, or any non-terminal writer like a bytes.Buffer in tests or a piped stdout) fall back
 		// to plainSink, which prints plain logboek lines and has no pinned bar (bar stays nil).
-		real := isRealTerminal(cfg.ttyW)
+		real := cfg.isTTY && isRealTerminal(cfg.ttyW)
 		rc := rendererConfig{out: cfg.ttyW, level: cfg.level, color: real}
 		if cfg.interactive && real && fitsLiveBlock() {
 			bl := termui.New(cfg.ttyW, termui.Options{Color: real})
@@ -117,25 +119,23 @@ func (h *TerminalUIHandler) Handle(ctx context.Context, r slog.Record) error {
 		return err
 	}
 	if h.routeToTTY(r) {
-		// Terminal output errors are non-fatal for the record's persistence.
+		// External output errors are non-fatal for the record's persistence.
 		_ = h.tty.Handle(ctx, r)
 	}
 	return nil
 }
 
-// routeToTTY decides whether r reaches the terminal sink. The file sink always receives every
-// record (handled above); this gate only governs the curated/live terminal view.
+// routeToTTY decides whether r reaches the external output sink. The file sink always receives every
+// record (handled above); this gate only governs the curated plain or interactive output.
 //
-//   - DEBUG records never reach the terminal (the file sink keeps them); the terminal floor is Info.
-//     DHCTL_DEBUG only enriches the file, so the terminal looks identical with or without it.
+//   - DEBUG records never reach the external output sink; the file sink keeps them.
+//     DHCTL_DEBUG only enriches the file.
 //   - A live interactive block also wants ordinary detail (Info + FileOnly) to feed its ephemeral
 //     log box, so once past the level gate everything is forwarded; the file sink already captured it.
-//   - FileOnly records (lib-connection streamed command output) stay off the compact terminal even
-//     at Error level — they would flood it; the user is pointed to the debug-log file. -v shows them.
-//   - Otherwise a record reaches the terminal when: verbose (-v) shows everything; control markers
-//     (progress/process) always pass (they drive the bar/current-action/boxes, not visible text);
-//     ShowInCompacted() is the curated compact-view text; Warn and above is always visible so
-//     failures are never hidden in compact mode.
+//   - FileOnly records stay off compact output even at Error level unless verbose mode is enabled,
+//     because they could flood the output.
+//   - Otherwise a record reaches the external output sink when verbose mode is enabled, it carries
+//     a renderer marker, it is tagged with ShowInCompacted(), or its level is Warn+.
 func (h *TerminalUIHandler) routeToTTY(r slog.Record) bool {
 	if h.tty == nil || r.Level < slog.LevelInfo {
 		return false
