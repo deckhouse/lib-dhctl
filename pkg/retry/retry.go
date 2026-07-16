@@ -34,12 +34,33 @@ const (
 	NotSetName = "Name not set"
 )
 
+// InTestEnvironment, when set, collapses every loop to a single, wait-free
+// attempt so tests exercising retry-driven code don't pay real wall-clock time.
+var InTestEnvironment = false
+
+func setupTests(attemptsQuantity *int, wait *time.Duration) {
+	if InTestEnvironment {
+		*attemptsQuantity = 1
+		*wait = 0 * time.Second
+	}
+}
+
 type BreakPredicate func(err error) bool
 
 func IsErr(err error) BreakPredicate {
 	return func(target error) bool {
 		return errors.Is(err, target)
 	}
+}
+
+func isWhitelistedError(err error, whitelist []error) bool {
+	for _, target := range whitelist {
+		if errors.Is(err, target) {
+			return true
+		}
+	}
+
+	return false
 }
 
 type ParamsBuilderOpt func(Params)
@@ -49,6 +70,8 @@ type Params interface {
 	Attempts() int
 	Wait() time.Duration
 	Logger() *slog.Logger
+	Whitelisted() bool
+	WhitelistedErrors() []error
 
 	Clone(overrides ...ParamsBuilderOpt) Params
 }
@@ -93,11 +116,25 @@ func WithWait(wait time.Duration) ParamsBuilderOpt {
 	}
 }
 
+// WithWhitelist marks the loop as whitelisted and sets the errors that are allowed to be retried.
+// If errs is empty, retry behaves as if whitelist was never set (backward compatible).
+// If errs is not empty, a returned error that does not match any whitelisted error (via errors.Is)
+// stops the loop immediately instead of retrying.
+func WithWhitelist(errs ...error) ParamsBuilderOpt {
+	return func(p Params) {
+		pp := p.(*params)
+		pp.whitelisted = true
+		pp.whitelistedErrors = errs
+	}
+}
+
 type params struct {
-	name     string
-	attempts int
-	wait     time.Duration
-	logger   *slog.Logger
+	name              string
+	attempts          int
+	wait              time.Duration
+	logger            *slog.Logger
+	whitelisted       bool
+	whitelistedErrors []error
 }
 
 // NewParams
@@ -141,6 +178,14 @@ func (p *params) Logger() *slog.Logger {
 	return p.logger
 }
 
+func (p *params) Whitelisted() bool {
+	return p.whitelisted
+}
+
+func (p *params) WhitelistedErrors() []error {
+	return p.whitelistedErrors
+}
+
 func (p *params) Clone(overrides ...ParamsBuilderOpt) Params {
 	if govalue.IsNil(p) {
 		return nil
@@ -151,6 +196,10 @@ func (p *params) Clone(overrides ...ParamsBuilderOpt) Params {
 		WithName("%s", p.Name()),
 		WithAttempts(p.Attempts()),
 		WithWait(p.Wait()),
+	}
+
+	if p.Whitelisted() {
+		cloneOpts = append(cloneOpts, WithWhitelist(p.WhitelistedErrors()...))
 	}
 
 	cloneOpts = append(cloneOpts, overrides...)
@@ -168,15 +217,17 @@ func SafeCloneOrNewParams(p Params, opts ...ParamsBuilderOpt) Params {
 
 // Loop retries a task function until it succeeded with number of attempts and delay between runs are adjustable.
 type Loop struct {
-	name             string
-	attemptsQuantity int
-	waitTime         time.Duration
-	breakPredicate   BreakPredicate
-	logger           *slog.Logger
-	interruptable    bool
-	showError        bool
-	silent           bool
-	prefix           string
+	name              string
+	attemptsQuantity  int
+	waitTime          time.Duration
+	breakPredicate    BreakPredicate
+	logger            *slog.Logger
+	interruptable     bool
+	showError         bool
+	silent            bool
+	prefix            string
+	whitelisted       bool
+	whitelistedErrors []error
 }
 
 // NewLoop create Loop with features:
@@ -201,12 +252,14 @@ func NewLoopWithParams(params Params) *Loop {
 	}
 
 	return &Loop{
-		name:             p.Name(),
-		attemptsQuantity: p.Attempts(),
-		waitTime:         p.Wait(),
-		logger:           p.Logger(),
-		interruptable:    true,
-		showError:        true,
+		name:              p.Name(),
+		attemptsQuantity:  p.Attempts(),
+		waitTime:          p.Wait(),
+		logger:            p.Logger(),
+		interruptable:     true,
+		showError:         true,
+		whitelisted:       p.Whitelisted(),
+		whitelistedErrors: p.WhitelistedErrors(),
 	}
 }
 
@@ -242,10 +295,12 @@ func NewSilentLoopWithParams(params Params) *Loop {
 		waitTime:         p.Wait(),
 		logger:           p.Logger(),
 		// - this loop is not interruptable by the signal watcher in tomb package.
-		interruptable: false,
-		showError:     true,
-		silent:        true,
-		prefix:        fmt.Sprintf("[%s][%d] ", name, rand.Int()),
+		interruptable:     false,
+		showError:         true,
+		silent:            true,
+		prefix:            fmt.Sprintf("[%s][%d] ", name, rand.Int()),
+		whitelisted:       p.Whitelisted(),
+		whitelistedErrors: p.WhitelistedErrors(),
 	}
 }
 
@@ -283,6 +338,8 @@ func (l *Loop) RunContext(ctx context.Context, task func() error) error {
 }
 
 func (l *Loop) run(ctx context.Context, task func() error) error {
+	setupTests(&l.attemptsQuantity, &l.waitTime)
+
 	if l.attemptsQuantity < 1 {
 		return fmt.Errorf("Attempts quantity must be greater than zero for loop '%s'", l.name)
 	}
@@ -314,16 +371,21 @@ func (l *Loop) run(ctx context.Context, task func() error) error {
 				return err
 			}
 
-			logger.FailRetry(ctx, l.logger, fmt.Sprintf(l.prefix+attemptMessage, i, l.attemptsQuantity, l.name, l.waitTime))
+			if l.whitelisted && len(l.whitelistedErrors) > 0 && !isWhitelistedError(err, l.whitelistedErrors) {
+				l.logger.DebugContext(ctx, fmt.Sprintf(l.prefix+"Error is not whitelisted, stop loop with %v", err))
+				return err
+			}
+
+			// Per-attempt diagnostics are Debug-only (file, not terminal): a loop that's
+			// going to succeed after a few retries shouldn't spam the compact view with
+			// one line per attempt. Only the final exhaustion error (returned below if
+			// every attempt fails) is meant to surface to the caller.
+			l.logger.DebugContext(ctx, fmt.Sprintf(l.prefix+attemptMessage, i, l.attemptsQuantity, l.name, l.waitTime))
 			errorMsg := "\t%v\n\n"
 			if l.showError {
 				errorMsg = "\tStatus: %v\n\n"
 			}
-			if l.silent {
-				l.logger.DebugContext(ctx, fmt.Sprintf(l.prefix+errorMsg, err))
-			} else {
-				l.logger.InfoContext(ctx, fmt.Sprintf(l.prefix+errorMsg, err))
-			}
+			l.logger.DebugContext(ctx, fmt.Sprintf(l.prefix+errorMsg, err))
 
 			// Do not waitTime after the last iteration.
 			if i < l.attemptsQuantity {
