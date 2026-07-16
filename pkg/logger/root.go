@@ -22,15 +22,17 @@ import (
 
 // Options configures the root logger.
 //   - FileWriter receives every record (the always-on debug-file sink). Required.
-//   - TTYWriter, when non-nil and IsTTY is true, receives ShowInCompacted()-tagged records (the terminal).
+//   - TTYWriter, when non-nil, receives terminal or plain non-TTY output.
+//   - IsTTY determines whether TTYWriter supports interactive terminal rendering.
 type Options struct {
 	FileWriter io.Writer // required; always-on sink
-	TTYWriter  io.Writer // optional; terminal sink for ShowInCompacted()-tagged records
-	IsTTY      bool      // whether TTYWriter is a terminal (enables the terminal sink at all)
-	// Interactive enables the pinned pterm progress bar. False (e.g. with -v) keeps the terminal
-	// sink but renders plain linear lines with no pinned block.
+	TTYWriter  io.Writer // optional; terminal or plain non-TTY output sink
+	IsTTY      bool      // whether TTYWriter is connected to an interactive terminal
+	// Interactive enables the pinned pterm progress bar when TTYWriter is connected
+	// to a real terminal. Otherwise, the sink renders plain linear output.
 	Interactive bool
-	// Verbose (-v) shows every Info+ record on the terminal, not just the curated compact output.
+	// Verbose (-v) shows every Info+ record in the output stream,
+	// not just curated compact output.
 	Verbose bool
 }
 
@@ -67,21 +69,21 @@ func RestoreTerminal() {
 // NewRoot builds the application root logger. Replaces InitLogger / InitLoggerWithOptions /
 // WrapWithTeeLogger / NewLogToFile from the old package.
 func NewRoot(opts Options) *slog.Logger {
-	// The file sink always captures everything (full debug log), so the level stays at Debug. The
-	// terminal floor is fixed at Info (DEBUG never reaches it); DHCTL_DEBUG only enriches the file.
+	// The file sink always captures every record, including DEBUG.
+	// The external output floor is fixed at Info, so DEBUG records remain file-only.
 	lv := new(slog.LevelVar)
 	lv.Set(slog.LevelDebug)
 
-	// enableTTY turns on the terminal sink whenever stdout is a terminal — independent of verbosity,
-	// so -v never silences the terminal. The pinned pterm bar is used only when Interactive; otherwise
-	// (e.g. -v) the handler renders plain linear lines. verbose (-v) makes the terminal show every
-	// Info+ record; otherwise it shows only the curated ShowInCompacted()-tagged output (process
-	// boxes, step changes, status) — everything else goes to the debug file only.
-	enableTTY := opts.IsTTY && opts.TTYWriter != nil
+	// TTYWriter enables external output whenever it is configured.
+	// IsTTY selects the rendering mode: interactive terminal output for a real TTY,
+	// or plain linear output for non-TTY consumers such as pipes, CI, and the installer.
+	// The pinned pterm bar is used only when Interactive is true and the writer is a real terminal.
+	// Verbose (-v) shows every Info+ record; otherwise only curated compact output,
+	// process markers, and Warn+ records are shown. DEBUG records remain in the file sink only.
 	h := newTerminalUIHandler(handlerConfig{
 		fileW:       opts.FileWriter,
 		ttyW:        opts.TTYWriter,
-		isTTY:       enableTTY,
+		isTTY:       opts.IsTTY,
 		interactive: opts.Interactive,
 		level:       lv,
 		verbose:     opts.Verbose,
