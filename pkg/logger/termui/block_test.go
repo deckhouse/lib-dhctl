@@ -52,7 +52,7 @@ func TestBlockFinishRestoresAndDumps(t *testing.T) {
 	var buf bytes.Buffer
 	b := New(&buf, testOpts())
 	b.Start("Phase")
-	b.Milestone("SUCCESS", "did a thing")
+	b.Milestone("", "SUCCESS", "did a thing")
 	buf.Reset()
 	b.Finish()
 	out := buf.String()
@@ -97,6 +97,9 @@ func TestBlockContentMethodsRepaint(t *testing.T) {
 func TestBlockLogboxIsEphemeralRing(t *testing.T) {
 	var buf bytes.Buffer
 	b := New(&buf, testOpts())
+	// Only an active block buffers detail: before Start, Log is passthrough to the writer.
+	b.Start("ring")
+	defer b.Finish()
 	for i := 0; i < logboxRingCap+5; i++ {
 		b.Log("x")
 	}
@@ -154,7 +157,7 @@ func TestBlockPausedOutputIsTransientNotBuffered(t *testing.T) {
 	b.Pause()
 	buf.Reset()
 
-	b.Warn("Continue? [y/n]: ")
+	b.Warn("", "Continue? [y/n]: ")
 	b.Log("background detail")
 	out := buf.String()
 
@@ -272,7 +275,7 @@ func TestBlockConnStringPinnedAndDumped(t *testing.T) {
 	b.SetConnString("ssh user@host")
 	// Many milestones must NOT push the conn string out of the live view.
 	for i := 0; i < 30; i++ {
-		b.Milestone("SUCCESS", "phase")
+		b.Milestone("", "SUCCESS", "phase")
 	}
 	if !strings.Contains(buf.String(), "ssh user@host") {
 		t.Fatalf("conn string must stay pinned in the live region: %q", buf.String())
@@ -307,7 +310,7 @@ func TestBlockRestoreSurfacesErrors(t *testing.T) {
 	var buf bytes.Buffer
 	b := New(&buf, testOpts())
 	b.Start("P")
-	b.Warn("boom: cache exhausted") // ERROR-level lines route through Warn
+	b.Warn("", "boom: cache exhausted") // ERROR-level lines route through Warn
 	buf.Reset()
 	b.Restore() // fatal/safety teardown must still surface the error on exit
 	if !strings.Contains(buf.String(), "boom: cache exhausted") {
@@ -324,8 +327,87 @@ func TestBlockWarnAfterSummaryPrintsDirectly(t *testing.T) {
 	b.Start("P")
 	b.Finish() // closes the live UI and prints the summary
 	buf.Reset()
-	b.Warn(`preflight check "always-fail" failed`)
+	b.Warn("", `preflight check "always-fail" failed`)
 	if !strings.Contains(buf.String(), `preflight check "always-fail" failed`) {
 		t.Fatalf("post-summary Warn must print directly to the main screen: %q", buf.String())
+	}
+}
+
+// TestBlockWarnPrefixAppliedOnlyOnInlinePaths pins how the box prefix is used. The pinned warn
+// region renders warnings detached from any process block, so a "│ " there would draw a frame edge
+// next to a frame that is not on screen; the paths that print the line inline - during a pause,
+// before the block is active, and after the closing dump - sit between that block's other lines and
+// must keep it, or the frame tears.
+func TestBlockWarnPrefixAppliedOnlyOnInlinePaths(t *testing.T) {
+	const prefix = "│ "
+	const line = "worker node never became Ready"
+
+	t.Run("pinned region drops it", func(t *testing.T) {
+		var buf bytes.Buffer
+		b := New(&buf, testOpts())
+		b.Start("P")
+		b.Warn(prefix, line)
+
+		b.mu.Lock()
+		warns := append([]string(nil), b.warnsAll...)
+		b.mu.Unlock()
+
+		if len(warns) != 1 || warns[0] != line {
+			t.Fatalf("pinned warn must be stored unprefixed, got %q", warns)
+		}
+	})
+
+	t.Run("paused passthrough keeps it", func(t *testing.T) {
+		var buf bytes.Buffer
+		b := New(&buf, testOpts())
+		b.Start("P")
+		b.Pause()
+		buf.Reset()
+
+		b.Warn(prefix, line)
+		if !strings.Contains(buf.String(), prefix+line) {
+			t.Fatalf("paused warn lost the box prefix: %q", buf.String())
+		}
+	})
+
+	t.Run("post-summary write keeps it", func(t *testing.T) {
+		var buf bytes.Buffer
+		b := New(&buf, testOpts())
+		b.Start("P")
+		b.Finish()
+		buf.Reset()
+
+		b.Warn(prefix, line)
+		if !strings.Contains(buf.String(), prefix+line) {
+			t.Fatalf("post-summary warn lost the box prefix: %q", buf.String())
+		}
+	})
+}
+
+// TestBlockClearsMainScreenOnRestore covers the leftovers that used to trail the closing summary.
+// Leaving the alternate screen restores the main screen as it was when the run started - the
+// command that started this run, and whatever the previous run left below it - with the cursor
+// back among it. The summary is then written with \n and no erase, so a short line covers only
+// its own width and the tail of the longer line underneath survives beside it: "Control plane
+// readiness" ending in the remains of a path, or of the previous run's command line.
+func TestBlockClearsMainScreenOnRestore(t *testing.T) {
+	var buf bytes.Buffer
+	b := New(&buf, testOpts())
+	b.Start("run")
+	b.Milestone("", "FAILED", "Control plane readiness")
+
+	buf.Reset()
+	b.Finish()
+
+	out := buf.String()
+	leave := strings.Index(out, ansiLeaveAlt)
+	clear := strings.Index(out, ansiClearEOS)
+	summary := strings.Index(out, "Control plane readiness")
+	if leave < 0 || clear < 0 || summary < 0 {
+		t.Fatalf("expected leave-alt, clear and summary in %q", out)
+	}
+	if leave >= clear || clear >= summary {
+		t.Fatalf("the main screen must be cleared after leaving the alt screen and before the "+
+			"summary is written, got leave=%d clear=%d summary=%d in %q", leave, clear, summary, out)
 	}
 }

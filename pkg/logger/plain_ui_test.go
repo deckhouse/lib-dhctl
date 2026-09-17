@@ -69,8 +69,8 @@ func TestPlainSinkWritesLines(t *testing.T) {
 	var buf bytes.Buffer
 	ui := newPlainSink(&buf)
 	ui.Log("a line")
-	ui.Warn("a warn")
-	ui.Milestone("SUCCESS", "done")
+	ui.Warn("", "a warn")
+	ui.Milestone("", "SUCCESS", "done")
 	if buf.String() != "a line\na warn\nSUCCESS done\n" {
 		t.Fatalf("plain sink corrupted output: %q", buf.String())
 	}

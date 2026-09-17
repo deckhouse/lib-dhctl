@@ -43,7 +43,7 @@ func TestHasTTY(t *testing.T) {
 
 func TestProcessMarkers(t *testing.T) {
 	for _, ev := range []processEvent{processStart, processEnd, processFail} {
-		a := processAttr(ev, "name")
+		a := processAttr(ev, "name", processOptions{})
 		if a[0].Key != attrKeyProcessEvent || a[0].Value.String() != string(ev) {
 			t.Fatalf("event attr wrong: %v", a)
 		}

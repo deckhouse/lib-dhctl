@@ -23,6 +23,11 @@ const (
 	attrKeyProcessEvent = "process_event"
 	attrKeyProcessName  = "process_name"
 
+	// attrKeyProcessUntimed marks a process-start record whose block reports no duration when it
+	// closes. A block that only frames a report is not a measured operation, and "(0.00 seconds)"
+	// next to its title reads as a broken timer rather than as information.
+	attrKeyProcessUntimed = "process_untimed"
+
 	// attrKeyBadge marks a curated status record (phase transition, lib-connection Success/Fail/
 	// FailRetry) so the terminal renderer draws the legacy colored status badge before the title
 	// instead of level-plain text. Value is one of the badge* constants below.
@@ -39,9 +44,10 @@ const (
 
 // Badge status values carried by attrKeyBadge.
 const (
-	badgeSuccess = "success" // green background, " SUCCESS "
-	badgeFailed  = "failed"  // red background, " FAILED "
-	badgeWarning = "warning" // yellow background, " WARNING "
+	badgeSuccess    = "success"    // green background, " SUCCESS "
+	badgeFailed     = "failed"     // red background, " FAILED "
+	badgeWarning    = "warning"    // yellow background, " WARNING "
+	badgeDeprecated = "deprecated" // yellow background, " DEPRECATED "
 )
 
 // BadgeSuccess/BadgeFailed/BadgeWarning return the attribute tagging a record to render with the
@@ -49,6 +55,11 @@ const (
 func BadgeSuccess() slog.Attr { return slog.String(attrKeyBadge, badgeSuccess) }
 func BadgeFailed() slog.Attr  { return slog.String(attrKeyBadge, badgeFailed) }
 func BadgeWarning() slog.Attr { return slog.String(attrKeyBadge, badgeWarning) }
+
+// BadgeDeprecated tags a record naming one deprecated setting, so it renders as its own curated
+// line rather than scrolling past as detail. Deprecations are found while a configuration is parsed,
+// long before the operation they affect finishes, so they have to survive the run to be of any use.
+func BadgeDeprecated() slog.Attr { return slog.String(attrKeyBadge, badgeDeprecated) }
 
 // badgeStatus returns the badge value carried by r, or "" if absent.
 func badgeStatus(r slog.Record) string { return firstString(r, attrKeyBadge) }
@@ -108,11 +119,17 @@ func isRendererMarker(r slog.Record) bool {
 	return found
 }
 
-func processAttr(ev processEvent, name string) []slog.Attr {
-	return []slog.Attr{
+func processAttr(ev processEvent, name string, opts processOptions) []slog.Attr {
+	attrs := []slog.Attr{
 		slog.String(attrKeyProcessEvent, string(ev)),
 		slog.String(attrKeyProcessName, name),
 	}
+	// Only the start marker carries it: the renderer stores the flag on the open frame and reads
+	// it back when the matching end/fail marker arrives.
+	if ev == processStart && opts.untimed {
+		attrs = append(attrs, slog.Bool(attrKeyProcessUntimed, true))
+	}
+	return attrs
 }
 
 // recordProcessEvent returns the process_event value carried by r, or "" if absent.
@@ -120,3 +137,6 @@ func recordProcessEvent(r slog.Record) string { return firstString(r, attrKeyPro
 
 // recordProcessName returns the process_name value carried by r, or "" if absent.
 func recordProcessName(r slog.Record) string { return firstString(r, attrKeyProcessName) }
+
+// recordProcessUntimed reports whether r asks for a block that shows no duration when closed.
+func recordProcessUntimed(r slog.Record) bool { return firstBool(r, attrKeyProcessUntimed) }

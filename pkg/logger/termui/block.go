@@ -147,7 +147,16 @@ func (b *Block) restoreLocked() {
 	}
 	b.active = false
 	close(b.stop)
-	_, _ = io.WriteString(b.w, ansiShowCur+ansiLeaveAlt)
+	// Clear from the cursor down as the main screen comes back. Leaving the alternate screen
+	// restores the main screen exactly as it was when the run started - the shell prompt, the
+	// command that started this run, and whatever the previous run left below it - with the
+	// cursor back where it was, i.e. with all of that still sitting on the rows about to be
+	// written. The closing summary and everything printed after it are written with \n and no
+	// erase, so each line covers only its own width and the tail of the older, longer line
+	// underneath survives to the right of it: "Control plane readiness" ending in the remains
+	// of a path or of the previous run's command line. Erasing once here, rather than per line,
+	// also covers the deprecation notices and anything else printed after the summary.
+	_, _ = io.WriteString(b.w, ansiShowCur+ansiLeaveAlt+ansiClearEOS)
 }
 
 // repaintLocked renders the current frame in place: home, write each line + clear-EOL,
@@ -231,12 +240,15 @@ func (b *Block) frameLocked() frame {
 	}
 }
 
-func (b *Block) Milestone(status, text string) {
+// Milestone takes the box prefix of the process block the line came from, on the same terms as
+// Warn: it is applied only when the line is printed inline, and dropped for the pinned milestone
+// region and the closing summary, which render milestones detached from any block.
+func (b *Block) Milestone(prefix, status, text string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	line := formatMilestone(b.opts.Color, status, text)
 	if b.paused {
-		b.passthroughLocked(line)
+		b.passthroughLocked(prefix + line)
 		return
 	}
 	b.milestonesAll = append(b.milestonesAll, line)
@@ -274,15 +286,21 @@ func (b *Block) SetAction(text string) {
 	}
 }
 
-func (b *Block) Warn(line string) {
+// Warn takes the box prefix of the process block the line came from (empty at top level).
+// The prefix is applied only on the paths that print the line inline, interleaved with that
+// block's other lines - during a pause, before the block is active, and after the closing dump -
+// where dropping it would tear the ┌/│/└ frame. The pinned warn region and the closing summary
+// render warnings detached from any block, so there the prefix is dropped: it would draw a frame
+// edge next to a frame that is not on screen.
+func (b *Block) Warn(prefix, line string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.paused || !b.active {
-		b.passthroughLocked(line)
+		b.passthroughLocked(prefix + line)
 		return
 	}
 	if b.summarized {
-		b.writeLineLocked(line)
+		b.writeLineLocked(prefix + line)
 		return
 	}
 	b.warnsAll = append(b.warnsAll, line)

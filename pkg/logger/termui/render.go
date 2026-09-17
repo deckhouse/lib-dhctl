@@ -115,9 +115,30 @@ func actionLine(f frame) string {
 	return trunc(sp+" "+actionPrefix+f.action, f.width-1)
 }
 
-// formatMilestone renders a curated milestone line: a colored status badge
-// (SUCCESS green / WARNING yellow / FAILED red, matching the legacy logger) followed
-// by the text. Without color the badge degrades to the plain padded word.
+// milestoneBadges maps a milestone status to the style its badge is painted in: SUCCESS green,
+// WARNING and DEPRECATED yellow, FAILED red, matching the legacy logger.
+var milestoneBadges = map[string]*pterm.Style{
+	"FAILED":     pterm.NewStyle(pterm.BgRed, pterm.FgLightWhite),
+	"WARNING":    pterm.NewStyle(pterm.BgYellow, pterm.FgBlack),
+	"DEPRECATED": pterm.NewStyle(pterm.BgYellow, pterm.FgBlack),
+	"SUCCESS":    pterm.NewStyle(pterm.BgGreen, pterm.FgBlack),
+}
+
+// badgeWidth is the width every badge is padded to: the longest status word plus a space on each
+// side. It is derived from the table rather than baked into padded literals precisely so that
+// adding a status keeps the column true - DEPRECATED is three columns wider than SUCCESS was, and
+// with fixed literals every other badge would have stayed narrow, leaving the coloured blocks
+// ragged and the text starting in a different column on every line.
+var badgeWidth = func() int {
+	w := 0
+	for status := range milestoneBadges {
+		w = max(w, len(status))
+	}
+	return w + 2
+}()
+
+// formatMilestone renders a curated milestone line: a colored status badge followed by the text.
+// Without color the badge degrades to the plain padded word.
 // CONN is a special case: it renders as cyan text with no badge.
 func formatMilestone(color bool, status, text string) string {
 	if status == "CONN" {
@@ -126,23 +147,30 @@ func formatMilestone(color bool, status, text string) string {
 		}
 		return text
 	}
-	var label string
-	var style *pterm.Style
-	switch status {
-	case "FAILED":
-		label = " FAILED  "
-		style = pterm.NewStyle(pterm.BgRed, pterm.FgLightWhite)
-	case "WARNING":
-		label = " WARNING "
-		style = pterm.NewStyle(pterm.BgYellow, pterm.FgBlack)
-	default: // SUCCESS
-		label = " SUCCESS "
-		style = pterm.NewStyle(pterm.BgGreen, pterm.FgBlack)
+
+	style, known := milestoneBadges[status]
+	if !known {
+		// Unknown statuses have always rendered as SUCCESS; keep that rather than painting an
+		// unstyled word of arbitrary width into the column.
+		status, style = "SUCCESS", milestoneBadges["SUCCESS"]
 	}
+
+	label := centerPad(status, badgeWidth)
 	if color {
 		label = style.Sprint(label)
 	}
 	return label + " " + text
+}
+
+// centerPad centers s in width columns, putting the odd column on the right - the side the original
+// badges padded (" FAILED  ").
+func centerPad(s string, width int) string {
+	pad := width - len(s)
+	if pad <= 0 {
+		return s
+	}
+	left := pad / 2
+	return strings.Repeat(" ", left) + s + strings.Repeat(" ", pad-left)
 }
 
 func fmtElapsed(d time.Duration) string {
