@@ -207,6 +207,28 @@ func (b *Block) SetConnString(s string) {
 	}
 }
 
+// visibleWarnsLocked picks the warn lines the live region shows, newest record first and each
+// record from its head down, up to Caps.warn lines in all.
+//
+// Per record, not per line: a record that does not fit loses its tail rather than its head. An
+// error's first line is its message and the rest is context - a terraform failure ends in the
+// file and line it came from - so keeping the newest lines kept the context of the newest error
+// and dropped the error. Returned in the order they were logged; the closing summary is not
+// bounded by the terminal and still prints every record whole.
+func (b *Block) visibleWarnsLocked() []string {
+	room := b.opts.Caps.warn
+	var out []string
+	for i := len(b.warnsAll) - 1; i >= 0 && room > 0; i-- {
+		lines := strings.Split(b.warnsAll[i], "\n")
+		if len(lines) > room {
+			lines = lines[:room]
+		}
+		room -= len(lines)
+		out = append(lines, out...)
+	}
+	return out
+}
+
 func (b *Block) frameLocked() frame {
 	width := b.opts.width()
 	height := b.opts.height()
@@ -214,14 +236,11 @@ func (b *Block) frameLocked() frame {
 	if b.connString != "" {
 		connLine = 1
 	}
-	lay := computeLayout(height, len(b.milestonesAll), len(b.warnsAll), len(b.banner), connLine, b.opts.Caps)
+	warns := b.visibleWarnsLocked()
+	lay := computeLayout(height, len(b.milestonesAll), len(warns), len(b.banner), connLine, b.opts.Caps)
 	var banner []string
 	if lay.banner {
 		banner = b.banner
-	}
-	warns := b.warnsAll
-	if len(warns) > b.opts.Caps.warn {
-		warns = warns[len(warns)-b.opts.Caps.warn:]
 	}
 	return frame{
 		title:      b.title,

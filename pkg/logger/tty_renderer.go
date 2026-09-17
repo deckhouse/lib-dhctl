@@ -65,14 +65,6 @@ type procFrame struct {
 	// frames a report - a list of failed resources, a summary - is not a measured operation,
 	// and "(0.00 seconds)" next to its title is noise.
 	untimed bool
-	// provisional holds the FAILED milestones of blocks that failed while this one was open,
-	// withheld until this block's own outcome says whether they mattered. See commitOrDefer.
-	provisional []milestoneRec
-}
-
-// milestoneRec is a milestone held back before it is printed.
-type milestoneRec struct {
-	prefix, status, text string
 }
 
 // ttyRenderer is a slog.Handler that renders the legacy logboek-style UI: process blocks framed
@@ -132,10 +124,10 @@ type repeatRun struct {
 // than a duplicate detail line: it holds a row of the live region for the whole run and a row of
 // the summary afterwards.
 //
-// This is the backstop, not the main defence: a repeated failure that a retry loop went on to
-// absorb is dropped outright rather than collapsed (see commitOrDefer). What is left for this to
-// catch is repetition that is real - a step genuinely reached, and failed, more than once, or the
-// same badge emitted by every item of a list - where the count is the news.
+// This is the backstop, not the main defence: a failure a retry loop absorbed never becomes a
+// milestone at all (see failureIsNews). What is left for this to catch is repetition that is real
+// - a step genuinely reached, and failed, more than once, or the same badge emitted by every item
+// of a list - where the count is the news.
 //
 // There is no time bound here, unlike repeatFlushInterval: the line a run is collapsing is already
 // on screen and stays there, so a silent run is never mistaken for a hang.
@@ -260,14 +252,11 @@ func (h *ttyRenderer) Handle(_ context.Context, r slog.Record) error {
 			// Only there. A backend that writes its lines out permanently already has the FAILED
 			// border above, so the milestone added nothing but a duplicate - printed unprefixed,
 			// mid-frame, which also tore the block apart.
-			own := milestoneRec{
-				prefix: h.prefix(len(h.stack)),
-				status: milestoneStatus(badgeFailed),
-				text:   f.name,
+			// Only at the top level: see failureIsNews.
+			if len(h.stack) == 0 {
+				h.emitMilestone(h.prefix(0), milestoneStatus(badgeFailed), f.name)
 			}
-			h.commitOrDefer(append(f.provisional, own))
 		}
-		// A block that succeeded drops f.provisional with the frame: see commitOrDefer.
 		return nil
 	}
 
@@ -278,16 +267,36 @@ func (h *ttyRenderer) Handle(_ context.Context, r slog.Record) error {
 	}
 
 	// Ordinary log line(s). Warn and above are pinned by the sink; lower levels are ephemeral detail
-	// indented to the current process depth. A multi-line message is split so each line is routed
-	// individually (and detail lines keep the indent prefix so nested/tabular content stays aligned).
+	// indented to the current process depth.
 	prefix := h.prefix(len(h.stack))
-	warn := r.Level >= slog.LevelWarn
-	for _, ln := range strings.Split(strings.TrimRight(r.Message, "\n"), "\n") {
+	lines := strings.Split(strings.TrimRight(r.Message, "\n"), "\n")
+
+	// A warn+ record is pinned as one unit. The pinned region is only a few rows tall, so when a
+	// record does not fit, something has to go - and splitting the record into separate lines
+	// first made that decision line by line, keeping the newest rows. For a multi-line error that
+	// is the wrong half: what survived was the file-and-line footer of a terraform error while the
+	// error itself scrolled out from under it, leaving `107: resource "yandex_compute_instance"
+	// "master" {` pinned with nothing to say what was wrong with it. Kept whole, the sink can drop
+	// the record's tail instead and keep its head, which is the message.
+	if r.Level >= slog.LevelWarn {
+		for i, ln := range lines {
+			lines[i] = h.styleText(r.Level, ln)
+		}
+		record := strings.Join(lines, "\n")
+		if !h.absorbRepeat(prefix, record, true) {
+			h.emitLine(prefix, record, true)
+		}
+		return nil
+	}
+
+	// Detail lines are routed individually, and each keeps the indent prefix so nested or tabular
+	// content stays aligned under its block.
+	for _, ln := range lines {
 		styled := h.styleText(r.Level, ln)
-		if h.absorbRepeat(prefix, styled, warn) {
+		if h.absorbRepeat(prefix, styled, false) {
 			continue
 		}
-		h.emitLine(prefix, styled, warn)
+		h.emitLine(prefix, styled, false)
 	}
 	return nil
 }
@@ -334,32 +343,27 @@ func (h *ttyRenderer) absorbRepeat(prefix, line string, warn bool) bool {
 	return true
 }
 
-// commitOrDefer decides whether the FAILED milestones of a block that just failed are news.
+// failureIsNews explains the depth test at the processFail branch above: a failed process block
+// becomes a persistent FAILED milestone only when nothing encloses it.
 //
-// A failure inside another block is not yet an outcome - it is an attempt. The overwhelming case
-// is a retry loop: the loop frames itself as one block and calls its task inside it, so a task
-// that opens a block of its own opens and fails one per attempt, and those attempts are exactly
-// what a retry loop exists to absorb. Reporting each as a persistent milestone stated, in the one
-// region that survives to the end, that a run had failed forty times - next to the SUCCESS line
-// saying it had finished. A milestone cannot be taken back once printed, so the decision has to
-// be made before it is: hold a nested failure against the block that encloses it, and let that
-// block's own outcome settle it. Enclosing block failed - the attempt is part of the failure
-// story, and is handed further up (or printed, at the top). Enclosing block succeeded - something
-// retried and it worked, and the attempt is discarded along with the frame.
+// A failure inside another block is not an outcome. It is either an attempt - the overwhelming
+// case is a retry loop, which frames itself as one block and calls its task inside it, so a task
+// that opens a block of its own opens and fails one per attempt, and absorbing those is the whole
+// point of the loop - or it is one of the steps by which the enclosing block failed, which the
+// enclosing block is about to report under its own name. Either way, restating it in the one
+// region that survives to the end is wrong: in the first case it claims a run failed forty times
+// next to the SUCCESS line saying it finished, and in the second it states a single failure once
+// per level it travels through and once per item it happened to, which is how one converge that
+// did not converge came to occupy twelve rows.
 //
-// Depth is the whole test, so a failure at the top level - nothing to absorb it - prints at once,
-// as it always did. The one gap is a silent retry loop (NewSilentLoop opens no block of its own):
-// its attempts are top-level and print. Silent loops are silent precisely because they wrap
-// something not worth framing, so this has yet to come up in practice.
-func (h *ttyRenderer) commitOrDefer(pending []milestoneRec) {
-	if n := len(h.stack); n > 0 {
-		h.stack[n-1].provisional = append(h.stack[n-1].provisional, pending...)
-		return
-	}
-	for _, m := range pending {
-		h.emitMilestone(m.prefix, m.status, m.text)
-	}
-}
+// A milestone cannot be taken back once printed, which is why this is a test and not a cleanup.
+// What is lost is the ancestry, and it is lost on purpose: the error text printed under the
+// summary, the framed detail and the file log all say how it failed, and say it far better than a
+// stack of badges can. The summary is left saying what failed - once.
+//
+// The one gap is a silent retry loop (NewSilentLoop opens no block of its own): its attempts are
+// top-level and print. Silent loops are silent precisely because they wrap something not worth
+// framing, so this has yet to come up in practice.
 
 // emitMilestone prints a milestone unless it repeats the one before it, in which case it is
 // counted and the count is reported when the run ends (see flushMilestone).

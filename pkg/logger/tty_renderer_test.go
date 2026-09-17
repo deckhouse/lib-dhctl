@@ -52,9 +52,12 @@ func (f *fakeProgressUI) Milestone(prefix, status, text string) {
 
 // Warn and Log both feed writtenLine (accumulated, so multi-line renders such as nested boxes are
 // fully captured) so assertions can match on the rendered text regardless of which routed it.
-func (f *fakeProgressUI) Warn(prefix, line string) {
+// Warn receives a whole record, which may be multi-line; like plainSink it prefixes every line.
+func (f *fakeProgressUI) Warn(prefix, record string) {
 	f.calls = append(f.calls, "Warn")
-	f.writtenLine += prefix + line + "\n"
+	for _, line := range strings.Split(record, "\n") {
+		f.writtenLine += prefix + line + "\n"
+	}
 }
 func (f *fakeProgressUI) Log(line string) {
 	f.calls = append(f.calls, "Log")
@@ -777,8 +780,8 @@ func TestRendererDropsFailedAttemptsWhenTheEnclosingBlockSucceeds(t *testing.T) 
 	}
 }
 
-// The other half: when the enclosing block fails too, the attempt is part of the failure story and
-// must reach the summary - together with the block that enclosed it.
+// The other half: when the enclosing block fails too, the failure reaches the summary - as the
+// one operation that was asked for and did not finish, not as a badge per level it travelled up.
 func TestRendererKeepsFailedAttemptsWhenTheEnclosingBlockFails(t *testing.T) {
 	ui := &fakeProgressUI{}
 	rdr := newTTYRenderer(rendererConfig{
@@ -791,25 +794,55 @@ func TestRendererKeepsFailedAttemptsWhenTheEnclosingBlockFails(t *testing.T) {
 	_ = rdr.Handle(ctx, procFailRec("Control plane readiness"))
 	_ = rdr.Handle(ctx, procFailRec("Node master-0 readiness check"))
 
-	for _, want := range []string{
-		"FAILED Control plane readiness",
-		"FAILED Node master-0 readiness check",
-	} {
-		if !strings.Contains(ui.writtenLine, want) {
-			t.Fatalf("%q missing from the failure report: %q", want, ui.writtenLine)
-		}
+	if !strings.Contains(ui.writtenLine, "FAILED Node master-0 readiness check") {
+		t.Fatalf("the operation that failed must be reported: %q", ui.writtenLine)
 	}
-	// Innermost first: the check that actually failed, then the block it brought down.
-	inner := strings.Index(ui.writtenLine, "FAILED Control plane readiness")
-	outer := strings.Index(ui.writtenLine, "FAILED Node master-0 readiness check")
-	if inner > outer {
-		t.Fatalf("the cause must precede the block it failed: %q", ui.writtenLine)
+	if strings.Contains(ui.writtenLine, "FAILED Control plane readiness") {
+		t.Fatalf("a step of that failure must not get a badge of its own: %q", ui.writtenLine)
+	}
+	// The ancestry is not lost, it just stays where it belongs: the framed detail.
+	if !strings.Contains(ui.writtenLine, boxClose+" Control plane readiness FAILED") {
+		t.Fatalf("the framed detail must still show how it failed: %q", ui.writtenLine)
 	}
 }
 
-// Held failures survive an intermediate level: a grandchild failure is settled by the outcome of
-// the outermost block, not of the one that happened to be open when it failed.
-func TestRendererHeldFailuresBubbleThroughIntermediateBlocks(t *testing.T) {
+// The report from the screenshot: a converge that lost three masters, each through four levels of
+// blocks. Twelve rows for one converge that did not converge - and the operator wants one.
+func TestRendererReportsOneRowForOneFailedOperation(t *testing.T) {
+	ui := &fakeProgressUI{}
+	rdr := newTTYRenderer(rendererConfig{
+		out: &bytes.Buffer{}, sink: ui, bar: ui, level: slog.LevelDebug, ephemeralDetail: true,
+	})
+
+	ctx := context.Background()
+	_ = rdr.Handle(ctx, procStartRec("Process all nodes"))
+	for _, node := range []string{"master-0", "master-1", "master-2"} {
+		_ = rdr.Handle(ctx, procStartRec("Update Node "+node+" in NodeGroup master (replicas: 3)"))
+		_ = rdr.Handle(ctx, procStartRec("Pipeline master-node for "+node))
+		_ = rdr.Handle(ctx, procStartRec("infrastructure apply ..."))
+		_ = rdr.Handle(ctx, procFailRec("infrastructure apply ..."))
+		_ = rdr.Handle(ctx, procFailRec("Pipeline master-node for "+node))
+		_ = rdr.Handle(ctx, procFailRec("Update Node "+node+" in NodeGroup master (replicas: 3)"))
+	}
+	_ = rdr.Handle(ctx, procFailRec("Process all nodes"))
+
+	rows := 0
+	for _, c := range ui.calls {
+		if c == "Milestone" {
+			rows++
+		}
+	}
+	if rows != 1 {
+		t.Fatalf("want one row for one failed operation, got %d:\n%s", rows, ui.writtenLine)
+	}
+	if !strings.Contains(ui.writtenLine, "FAILED Process all nodes") {
+		t.Fatalf("the row must name the operation that was asked for: %q", ui.writtenLine)
+	}
+}
+
+// Nothing below the top level reports itself, however deep the failure started or how many
+// levels it passed through on the way up.
+func TestRendererOnlyTheOutermostFailureIsReported(t *testing.T) {
 	ctx := context.Background()
 
 	run := func(outerFails bool) *fakeProgressUI {
@@ -831,12 +864,15 @@ func TestRendererHeldFailuresBubbleThroughIntermediateBlocks(t *testing.T) {
 	}
 
 	if ui := run(false); ui.has("Milestone") {
-		t.Fatalf("outermost block succeeded: nothing held below it is news: %q", ui.writtenLine)
+		t.Fatalf("outermost block succeeded: nothing below it is news: %q", ui.writtenLine)
 	}
 	ui := run(true)
-	for _, want := range []string{"FAILED attempt", "FAILED wait", "FAILED converge"} {
-		if !strings.Contains(ui.writtenLine, want) {
-			t.Fatalf("%q missing once the outermost block failed: %q", want, ui.writtenLine)
+	if !strings.Contains(ui.writtenLine, "FAILED converge") {
+		t.Fatalf("the outermost failure must surface: %q", ui.writtenLine)
+	}
+	for _, unwanted := range []string{"FAILED attempt", "FAILED wait"} {
+		if strings.Contains(ui.writtenLine, unwanted) {
+			t.Fatalf("%q is a step of that failure, not news of its own: %q", unwanted, ui.writtenLine)
 		}
 	}
 }

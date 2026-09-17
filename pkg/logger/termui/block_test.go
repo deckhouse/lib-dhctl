@@ -411,3 +411,86 @@ func TestBlockClearsMainScreenOnRestore(t *testing.T) {
 			"summary is written, got leave=%d clear=%d summary=%d in %q", leave, clear, summary, out)
 	}
 }
+
+// TestBlockKeepsTheHeadOfAnErrorNotItsFooter is the terraform failure from the converge report: a
+// multi-line error whose last lines are the file and line it came from. The region is five rows,
+// and keeping the newest five left `107: resource "yandex_compute_instance" "master" {` pinned
+// with nothing on screen to say what was wrong with it.
+func TestBlockKeepsTheHeadOfAnErrorNotItsFooter(t *testing.T) {
+	var buf bytes.Buffer
+	b := New(&buf, testOpts())
+	b.Start("converge")
+	defer b.Finish()
+
+	b.Warn("", strings.Join([]string{
+		"Error: Provider produced inconsistent final plan",
+		"",
+		"  with yandex_compute_instance.master,",
+		"  on main.tf line 107, in resource \"yandex_compute_instance\" \"master\":",
+		"  107: resource \"yandex_compute_instance\" \"master\" {",
+		"",
+		"This is a bug in the provider.",
+	}, "\n"))
+
+	b.mu.Lock()
+	shown := b.visibleWarnsLocked()
+	b.mu.Unlock()
+
+	require := func(cond bool, format string, args ...any) {
+		t.Helper()
+		if !cond {
+			t.Fatalf(format, args...)
+		}
+	}
+	require(len(shown) == testOpts().Caps.warn, "want the region filled, got %d rows: %q", len(shown), shown)
+	require(shown[0] == "Error: Provider produced inconsistent final plan",
+		"the message must be the first thing kept, got %q", shown[0])
+	for _, line := range shown {
+		require(!strings.Contains(line, "This is a bug in the provider."),
+			"the tail is what gives way, not the head: %q", shown)
+	}
+}
+
+// Whatever the live region had to drop is still there at the end, where nothing bounds the height.
+func TestBlockSummaryKeepsEveryWarnLine(t *testing.T) {
+	var buf bytes.Buffer
+	b := New(&buf, testOpts())
+	b.Start("converge")
+	b.Warn("", "Error: one\ntwo\nthree\nfour\nfive\nsix\nseven")
+
+	buf.Reset()
+	b.Finish()
+
+	for _, want := range []string{"Error: one", "six", "seven"} {
+		if !strings.Contains(buf.String(), want) {
+			t.Fatalf("summary dropped %q: %q", want, buf.String())
+		}
+	}
+}
+
+// A second error must not be starved by the first: the newest record is served first.
+func TestBlockNewestErrorIsServedFirst(t *testing.T) {
+	var buf bytes.Buffer
+	b := New(&buf, testOpts())
+	b.Start("converge")
+	defer b.Finish()
+
+	b.Warn("", "Error: the older one\nits context\nmore context")
+	b.Warn("", "Error: the newer one\nits context")
+
+	b.mu.Lock()
+	shown := b.visibleWarnsLocked()
+	b.mu.Unlock()
+
+	joined := strings.Join(shown, "\n")
+	if !strings.Contains(joined, "Error: the newer one") {
+		t.Fatalf("the newest error must be shown: %q", shown)
+	}
+	if !strings.Contains(joined, "Error: the older one") {
+		t.Fatalf("the older error still fits and must keep its head: %q", shown)
+	}
+	// Logged order, not reverse: the region reads top to bottom as it happened.
+	if strings.Index(joined, "older") > strings.Index(joined, "newer") {
+		t.Fatalf("records must stay in the order they were logged: %q", shown)
+	}
+}
