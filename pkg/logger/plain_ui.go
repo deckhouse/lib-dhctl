@@ -44,9 +44,21 @@ func (p *plainSink) printf(s string) {
 	_, _ = io.WriteString(p.w, s)
 }
 
-func (p *plainSink) Milestone(status, text string) { p.printf(status + " " + text) }
-func (p *plainSink) Warn(line string)              { p.printf(line) }
-func (p *plainSink) Log(line string)               { p.printf(line) }
+func (p *plainSink) Log(line string) { p.printf(line) }
+
+// Milestone keeps the box prefix, for the same reason Warn does: the line is written out in emit
+// order, so one emitted from inside a process block sits between that block's other lines.
+func (p *plainSink) Milestone(prefix, status, text string) { p.printf(prefix + status + " " + text) }
+
+// Warn keeps the box prefix: every line goes to the writer in emit order, so a warning logged
+// from inside a process block sits between that block's other lines and must line up with them.
+// A record arrives whole (see the renderer), so the prefix goes on each of its lines - one prefix
+// for the first line and none for the rest would tear the frame open from the second line down.
+func (p *plainSink) Warn(prefix, record string) {
+	for _, line := range strings.Split(record, "\n") {
+		p.printf(prefix + line)
+	}
+}
 
 func (p *plainSink) SetBanner(lines []string) {
 	for _, l := range lines {

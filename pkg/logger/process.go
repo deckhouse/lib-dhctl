@@ -19,15 +19,39 @@ import (
 	"log/slog"
 )
 
+// ProcessOption tunes how a process block is rendered. Options are read off the start marker, so
+// they are passed to RunProcess/ProcessStart only; the matching end/fail marker inherits them.
+type ProcessOption func(*processOptions)
+
+type processOptions struct {
+	untimed bool
+}
+
+// WithoutTiming opens a block that shows no duration when it closes. Use it for a block that only
+// frames a report - a list of resources that failed, a summary of what was found - rather than
+// timing an operation: "(0.00 seconds)" under such a heading reads as a broken timer.
+func WithoutTiming() ProcessOption {
+	return func(o *processOptions) { o.untimed = true }
+}
+
+func applyProcessOptions(opts []ProcessOption) processOptions {
+	var o processOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
+	return o
+}
+
 // RunProcess wraps fn with process start/end (or start/fail) marker records, so the handler
 // can render a process block. The returned error is fn's error, unchanged.
-func RunProcess(ctx context.Context, l *slog.Logger, name string, fn func(context.Context) error) error {
-	emit(ctx, l, slog.LevelInfo, "Starting: "+name, processAttr(processStart, name))
+func RunProcess(ctx context.Context, l *slog.Logger, name string, fn func(context.Context) error, opts ...ProcessOption) error {
+	o := applyProcessOptions(opts)
+	emit(ctx, l, slog.LevelInfo, "Starting: "+name, processAttr(processStart, name, o))
 	if err := fn(ctx); err != nil {
-		emit(ctx, l, slog.LevelError, "Failed: "+name, processAttr(processFail, name))
+		emit(ctx, l, slog.LevelError, "Failed: "+name, processAttr(processFail, name, o))
 		return err
 	}
-	emit(ctx, l, slog.LevelInfo, "Finished: "+name, processAttr(processEnd, name))
+	emit(ctx, l, slog.LevelInfo, "Finished: "+name, processAttr(processEnd, name, o))
 	return nil
 }
 
@@ -59,14 +83,14 @@ func JSON(ctx context.Context, l *slog.Logger, data []byte) {
 	l.InfoContext(ctx, string(data))
 }
 
-func ProcessStart(ctx context.Context, l *slog.Logger, name string) {
-	emit(ctx, l, slog.LevelInfo, "Starting: "+name, processAttr(processStart, name))
+func ProcessStart(ctx context.Context, l *slog.Logger, name string, opts ...ProcessOption) {
+	emit(ctx, l, slog.LevelInfo, "Starting: "+name, processAttr(processStart, name, applyProcessOptions(opts)))
 }
 
 func ProcessEnd(ctx context.Context, l *slog.Logger, name string) {
-	emit(ctx, l, slog.LevelInfo, "Finished: "+name, processAttr(processEnd, name))
+	emit(ctx, l, slog.LevelInfo, "Finished: "+name, processAttr(processEnd, name, processOptions{}))
 }
 
 func ProcessFailed(ctx context.Context, l *slog.Logger, name string) {
-	emit(ctx, l, slog.LevelError, "Failed: "+name, processAttr(processFail, name))
+	emit(ctx, l, slog.LevelError, "Failed: "+name, processAttr(processFail, name, processOptions{}))
 }

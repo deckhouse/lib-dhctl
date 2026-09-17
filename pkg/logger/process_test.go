@@ -15,9 +15,11 @@
 package logger
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"testing"
 )
 
@@ -79,6 +81,56 @@ func TestRunProcessMarkersAreRendererMarkers(t *testing.T) {
 	for _, r := range c.records {
 		if !isRendererMarker(r) {
 			t.Fatalf("process record %q is not a renderer marker", r.Message)
+		}
+	}
+}
+
+// TestStreamLoggerKeepsProcessBoxIntact is the end-to-end guard for the torn frame, exercising the
+// real plain sink the commander stream and every non-TTY run use: every line a process block emits
+// between its ┌ and └ borders must carry the │ prefix, whatever level it was logged at.
+func TestStreamLoggerKeepsProcessBoxIntact(t *testing.T) {
+	var buf bytes.Buffer
+	l := NewStreamLogger(&buf)
+	ctx := context.Background()
+
+	err := RunProcess(ctx, l, "Resources failed to become ready", func(ctx context.Context) error {
+		l.InfoContext(ctx, "detail line")
+		l.WarnContext(ctx, "warning line\nsecond warning line")
+		l.ErrorContext(ctx, "error line")
+		return nil
+	}, WithoutTiming())
+	if err != nil {
+		t.Fatalf("RunProcess: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
+
+	closeAt := -1
+	for i, line := range lines {
+		if strings.HasPrefix(line, boxClose+" ") {
+			closeAt = i
+			break
+		}
+	}
+	if closeAt == -1 {
+		t.Fatalf("block never closed:\n%s", buf.String())
+	}
+	if !strings.HasPrefix(lines[0], boxOpen+" ") {
+		t.Fatalf("block never opened: %q", lines[0])
+	}
+	if strings.Contains(lines[closeAt], "seconds") {
+		t.Fatalf("WithoutTiming block still reports a duration: %q", lines[closeAt])
+	}
+
+	for _, line := range lines[1:closeAt] {
+		if !strings.HasPrefix(line, boxBody) {
+			t.Fatalf("line escaped the box: %q\nfull output:\n%s", line, buf.String())
+		}
+	}
+
+	for _, want := range []string{"detail line", "warning line", "second warning line", "error line"} {
+		if !strings.Contains(buf.String(), boxBody+want) {
+			t.Fatalf("%q missing or unprefixed:\n%s", want, buf.String())
 		}
 	}
 }

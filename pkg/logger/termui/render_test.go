@@ -125,3 +125,54 @@ func TestRenderFrameColorWidthSafe(t *testing.T) {
 		t.Fatalf("colored bar lost its %% readout: %q", pterm.RemoveColorFromString(bar))
 	}
 }
+
+// TestFormatMilestoneBadgesAreAligned pins the column: every badge is padded to one width, so the
+// colored blocks end together and the text after them starts together however long the status word
+// is. Adding a status must not knock the others out of line.
+func TestFormatMilestoneBadgesAreAligned(t *testing.T) {
+	const text = "some milestone"
+
+	var width int
+	for _, status := range []string{"SUCCESS", "WARNING", "FAILED", "DEPRECATED"} {
+		line := formatMilestone(false, status, text)
+
+		at := strings.Index(line, text)
+		if at < 0 {
+			t.Fatalf("%s: text missing: %q", status, line)
+		}
+		if width == 0 {
+			width = at
+		}
+		if at != width {
+			t.Fatalf("%s: text starts at column %d, expected %d: %q", status, at, width, line)
+		}
+		if !strings.Contains(line, status) {
+			t.Fatalf("%s: badge word missing: %q", status, line)
+		}
+	}
+}
+
+// TestFormatMilestoneDeprecated pins the DEPRECATED badge itself: yellow like WARNING, and degrading
+// to the plain padded word when color is off.
+func TestFormatMilestoneDeprecated(t *testing.T) {
+	plain := formatMilestone(false, "DEPRECATED", "ClusterConfiguration: kubernetesVersion")
+	if plain != " DEPRECATED  ClusterConfiguration: kubernetesVersion" {
+		t.Fatalf("uncolored badge wrong: %q", plain)
+	}
+
+	colored := formatMilestone(true, "DEPRECATED", "x")
+	if colored == plain {
+		t.Fatalf("colored badge not styled: %q", colored)
+	}
+	if colored != strings.Replace(formatMilestone(true, "WARNING", "x"), "  WARNING   ", " DEPRECATED ", 1) {
+		t.Fatalf("DEPRECATED must be styled exactly like WARNING: %q", colored)
+	}
+}
+
+// TestFormatMilestoneUnknownStatusRendersAsSuccess keeps the long-standing fallback: an unrecognised
+// status must not paint an unstyled word of arbitrary width into the aligned column.
+func TestFormatMilestoneUnknownStatusRendersAsSuccess(t *testing.T) {
+	if got, want := formatMilestone(false, "WHATEVER", "x"), formatMilestone(false, "SUCCESS", "x"); got != want {
+		t.Fatalf("unknown status rendered as %q, expected %q", got, want)
+	}
+}

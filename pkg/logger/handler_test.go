@@ -172,3 +172,52 @@ func TestHandlerEnabledHonoursLevel(t *testing.T) {
 		t.Fatal("info should be enabled")
 	}
 }
+
+// TestHandlerStreamOutputKeepsBlockContents covers the empty-blocks bug: with no terminal attached
+// (a pipe, `docker logs` on a container started without a TTY, a CI job log) process borders are
+// renderer markers and always got through, while the ordinary lines between them were filtered out
+// as "not curated". The reader was left with ┌ and └ and nothing in between.
+func TestHandlerStreamOutputKeepsBlockContents(t *testing.T) {
+	var file, out bytes.Buffer
+	l := slog.New(newTestHandler(&file, &out, false)) // isTTY=false → stream consumer
+
+	err := RunProcess(context.Background(), l, "Waiting for Deckhouse to become Ready", func(ctx context.Context) error {
+		l.InfoContext(ctx, "Deckhouse pod found: deckhouse-5bdf56b45d-nvj2h (Pending)")
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("RunProcess: %v", err)
+	}
+
+	if !strings.Contains(out.String(), "Deckhouse pod found") {
+		t.Fatalf("stream output dropped the block contents, leaving empty borders: %q", out.String())
+	}
+}
+
+// TestHandlerStreamOutputStillHidesFileOnly is the limit of the rule above: FileOnly exists to keep
+// streamed command output (bashible/ssh, remote `set -x`) out of the operator-facing log, and a
+// non-terminal consumer is exactly where that flood would be worst.
+func TestHandlerStreamOutputStillHidesFileOnly(t *testing.T) {
+	var file, out bytes.Buffer
+	l := slog.New(newTestHandler(&file, &out, false))
+	l.LogAttrs(context.Background(), slog.LevelError, "bashible set -x spam", FileOnly())
+
+	if strings.Contains(out.String(), "bashible set -x spam") {
+		t.Fatalf("file-only record leaked to the stream: %q", out.String())
+	}
+	if !strings.Contains(file.String(), "bashible set -x spam") {
+		t.Fatalf("file must keep file-only record: %q", file.String())
+	}
+}
+
+// TestHandlerCompactTTYStillFiltersDetail is the control: with a terminal attached the user asked
+// for the curated view, so ordinary untagged detail stays off it.
+func TestHandlerCompactTTYStillFiltersDetail(t *testing.T) {
+	var file, tty bytes.Buffer
+	l := slog.New(newTestHandler(&file, &tty, true))
+	l.Info("ordinary detail")
+
+	if strings.Contains(tty.String(), "ordinary detail") {
+		t.Fatalf("compact terminal must not show untagged detail: %q", tty.String())
+	}
+}

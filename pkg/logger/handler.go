@@ -46,6 +46,10 @@ type TerminalUIHandler struct {
 	// terminal). In that mode ordinary detail (Info + FileOnly) is also forwarded to the tty sink so
 	// it feeds the block's ephemeral log box; the file sink keeps it regardless.
 	interactiveBlock bool
+	// streamOutput is true when the output writer is not a terminal at all - a pipe, `docker logs`,
+	// a CI job log. There is no pinned region and no closing summary there: what is written IS the
+	// log, so ordinary detail is forwarded rather than filtered down to the curated compact view.
+	streamOutput bool
 	// block is the live termui.Block when interactiveBlock is true, nil otherwise. Held so that
 	// RestoreTerminal can leave the alternate screen on any exit path (signal, panic, normal).
 	block *termui.Block
@@ -77,12 +81,14 @@ func newTerminalUIHandler(cfg handlerConfig) *TerminalUIHandler {
 		// is a real terminal AND the terminal is tall enough; otherwise (non-interactive -v dump, a tiny
 		// terminal, or any non-terminal writer like a bytes.Buffer in tests or a piped stdout) fall back
 		// to plainSink, which prints plain logboek lines and has no pinned bar (bar stays nil).
+		h.streamOutput = !cfg.isTTY
 		real := cfg.isTTY && isRealTerminal(cfg.ttyW)
 		rc := rendererConfig{out: cfg.ttyW, level: cfg.level, color: real}
 		if cfg.interactive && real && fitsLiveBlock() {
 			bl := termui.New(cfg.ttyW, termui.Options{Color: real})
 			rc.sink = bl
 			rc.bar = bl
+			rc.ephemeralDetail = true // the live block wipes its log box on teardown
 			h.interactiveBlock = true
 			h.block = bl
 		} else {
@@ -134,6 +140,7 @@ func (h *TerminalUIHandler) Handle(ctx context.Context, r slog.Record) error {
 //     log box, so once past the level gate everything is forwarded; the file sink already captured it.
 //   - FileOnly records stay off compact output even at Error level unless verbose mode is enabled,
 //     because they could flood the output.
+//   - A non-terminal consumer gets ordinary detail too: see streamOutput.
 //   - Otherwise a record reaches the external output sink when verbose mode is enabled, it carries
 //     a renderer marker, it is tagged with ShowInCompacted(), or its level is Warn+.
 func (h *TerminalUIHandler) routeToTTY(r slog.Record) bool {
@@ -146,6 +153,13 @@ func (h *TerminalUIHandler) routeToTTY(r slog.Record) bool {
 	if hasFileOnly(r) && !h.verbose {
 		return false
 	}
+	// Without a terminal there is no compact view to fall back on - no pinned milestones, no
+	// closing summary, nothing redrawn later. Filtering ordinary detail there does not condense
+	// the output, it empties it: process markers are renderer markers and get through, so the
+	// reader is left with ┌ and └ borders and nothing between them.
+	if h.streamOutput {
+		return true
+	}
 	return h.verbose || isRendererMarker(r) || h.compactTagged ||
 		hasShowInCompacted(r) || r.Level >= slog.LevelWarn
 }
@@ -157,6 +171,7 @@ func (h *TerminalUIHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 		verbose:          h.verbose,
 		compactTagged:    h.compactTagged || attrsContainShowInCompacted(attrs),
 		interactiveBlock: h.interactiveBlock,
+		streamOutput:     h.streamOutput,
 		block:            h.block,
 	}
 	if h.tty != nil {
@@ -172,6 +187,7 @@ func (h *TerminalUIHandler) WithGroup(name string) slog.Handler {
 		verbose:          h.verbose,
 		compactTagged:    h.compactTagged,
 		interactiveBlock: h.interactiveBlock,
+		streamOutput:     h.streamOutput,
 		block:            h.block,
 	}
 	if h.tty != nil {
