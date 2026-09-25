@@ -936,3 +936,47 @@ func TestLiveBlockSummaryOmitsAbsorbedRetries(t *testing.T) {
 		t.Fatalf("the summary lost what actually happened:\n%s", summary)
 	}
 }
+
+// TestLiveBlockSummaryOmitsFileOnlyWarnings covers streamed command output logged at Warn with
+// FileOnly: the live block used to pin every such line and dump all of them in the closing summary,
+// so a retried ssh command left one "Permission denied" per attempt on the main screen. The handler
+// is wired as production wires it for a live block, so the record takes the real routeToTTY path.
+func TestLiveBlockSummaryOmitsFileOnlyWarnings(t *testing.T) {
+	var buf bytes.Buffer
+	bl := termui.New(&buf, termui.Options{Color: false})
+	h := &TerminalUIHandler{
+		file:  slog.NewJSONHandler(&bytes.Buffer{}, nil),
+		level: slog.LevelDebug,
+		tty: newTTYRenderer(rendererConfig{
+			out: &buf, sink: bl, bar: bl, level: slog.LevelDebug, ephemeralDetail: true,
+		}),
+		interactiveBlock: true,
+		block:            bl,
+	}
+	l := slog.New(h)
+
+	ctx := context.Background()
+	l.InfoContext(ctx, "destroy",
+		slog.String(attrKeyProgressEvent, string(progressStart)),
+		slog.String(attrKeyProgressName, "destroy"))
+	l.LogAttrs(ctx, slog.LevelWarn, "Permission denied (publickey).", FileOnly())
+	l.WarnContext(ctx, "Cleanup failed, retrying")
+	l.InfoContext(ctx, "destroy", slog.String(attrKeyProgressEvent, string(progressEnd)))
+
+	out := buf.String()
+	leave := strings.LastIndex(out, "\x1b[?1049l")
+	if leave < 0 {
+		t.Fatalf("the block never left the alternate screen: %q", out)
+	}
+	if !strings.Contains(out[:leave], "Permission denied") {
+		t.Fatalf("a FileOnly warning must still feed the live log box: %q", out[:leave])
+	}
+	summary := out[leave:]
+
+	if strings.Contains(summary, "Permission denied") {
+		t.Fatalf("a FileOnly warning must not reach the closing summary:\n%s", summary)
+	}
+	if !strings.Contains(summary, "Cleanup failed, retrying") {
+		t.Fatalf("an ordinary warning must still reach the closing summary:\n%s", summary)
+	}
+}

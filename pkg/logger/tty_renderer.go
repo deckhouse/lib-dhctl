@@ -278,7 +278,11 @@ func (h *ttyRenderer) Handle(_ context.Context, r slog.Record) error {
 	// error itself scrolled out from under it, leaving `107: resource "yandex_compute_instance"
 	// "master" {` pinned with nothing to say what was wrong with it. Kept whole, the sink can drop
 	// the record's tail instead and keep its head, which is the message.
-	if r.Level >= slog.LevelWarn {
+	//
+	// A FileOnly record is detail whatever its level: it reaches this renderer only to feed the live
+	// block's ephemeral log box, or because -v asked for everything. Pinned, every line of it would
+	// be dumped again in the closing summary.
+	if r.Level >= slog.LevelWarn && !hasFileOnly(r) {
 		for i, ln := range lines {
 			lines[i] = h.styleText(r.Level, ln)
 		}
